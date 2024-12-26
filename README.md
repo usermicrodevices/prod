@@ -1,0 +1,2 @@
+# ashop
+django shop
