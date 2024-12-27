@@ -1,8 +1,7 @@
 from pathlib import Path
-
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-6qvh@36kg8xyr5$=3m=fhm-0y$#u0vc!)+maftswc=%l7sq$t*'
+SECRET_KEY = 'dummy-key-require-replaced-in-production'
 
 DEBUG = True
 
@@ -15,6 +14,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'users.apps.UsersConfig',
+    'refs.apps.RefsConfig',
+    'core.apps.CoreConfig'
 ]
 
 MIDDLEWARE = [
@@ -32,8 +34,6 @@ ROOT_URLCONF = 'shop.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
         'OPTIONS': {
             'libraries': {'staticfiles':'django.templatetags.static'},
             'context_processors': [
@@ -98,3 +98,12 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 102400
+
+CACHES = {
+'default':{'BACKEND':'django.core.cache.backends.locmem.LocMemCache', 'OPTIONS':{'MAX_ENTRIES':99999999, 'CULL_FREQUENCY':99999998}},
+'users':{'BACKEND':'django.core.cache.backends.locmem.LocMemCache', 'LOCATION':'users', 'TIMEOUT':86400, 'OPTIONS':{'MAX_ENTRIES':99999999, 'CULL_FREQUENCY':99999998}},
+}
+
+AUTH_USER_MODEL = 'users.User'
+
+ADMIN_PATH_PREFIX = '/admin'
