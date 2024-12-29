@@ -87,17 +87,17 @@ class Unit(models.Model):
         verbose_name_plural = f'👾{_("Units")}'
 
 
-class Nds(models.Model):
+class Tax(models.Model):
     name = models.CharField(max_length=191, unique=True, null=False, blank=False, default='', verbose_name=_('name'))
     alias = models.CharField(max_length=191, null=True, blank=True, default='', verbose_name=_('alias'))
-    value = models.IntegerField(default=None, null=True, blank=True, verbose_name=_('value'), help_text=_('percentage value of nds'))
+    value = models.IntegerField(default=None, null=True, blank=True, verbose_name=_('value'), help_text=_('percentage value of tax'))
 
     def __str__(self):
         return self.name
 
     class Meta:
-        verbose_name = f'󠀥󠀥󠀥󠀥󠀥󠀥💯{_("Nds")}'
-        verbose_name_plural = f'💯{_("Ndses")}'
+        verbose_name = f'󠀥󠀥󠀥󠀥󠀥󠀥💯{_("Tax")}'
+        verbose_name_plural = f'💯{_("Taxes")}'
         ordering = ['name']
 
 
@@ -265,7 +265,7 @@ class Product(models.Model):
     currency = models.ForeignKey(Currency, default=1, null=True, blank=True, on_delete=models.SET_NULL)
     model = models.ForeignKey(ProductModel, default=None, null=True, blank=True, on_delete=models.SET_NULL)
     unit = models.ForeignKey(Unit, default=1, null=True, blank=True, on_delete=models.SET_NULL)
-    nds = models.ForeignKey(Nds, default=1, null=True, blank=True, on_delete=models.SET_NULL)
+    tax = models.ForeignKey(Tax, default=None, null=True, blank=True, on_delete=models.SET_NULL, verbose_name=_('tax'), help_text=_('default tax'))
     barcodes = models.ManyToManyField(BarCode, default=None, blank=True, verbose_name=_('barcodes'), help_text=_('list barcodes of product'))
     qrcodes = models.ManyToManyField(QrCode, default=None, blank=True, verbose_name=_('qrcodes'), help_text=_('list qrcodes of product'))
     extinfo = JSONField(default=dict, blank=True)
@@ -278,3 +278,18 @@ class Product(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class DocType(models.Model):
+    alias = models.CharField(max_length=191, unique=True, default='receipt', null=False, blank=False)
+    name = models.CharField(max_length=191, default=_('Receipt'), verbose_name=_('name'), help_text=_('name of type document'))
+    income = models.BooleanField(default=True, null=False, blank=False, verbose_name=_('income'), help_text=_('income or expense'))
+    description = models.CharField(max_length=191, default=None, null=True, blank=True, verbose_name=_('description'), help_text=_('description of type document'))
+
+    def __str__(self):
+        return self.alias
+
+    class Meta:
+        verbose_name = f'🗂️{_("Doc Type")}'
+        verbose_name_plural = f'🗂️{_("Doc Types")}'
+        ordering = ['name']

@@ -1,3 +1,4 @@
+import logging, sys
 from decimal import Decimal
 from io import BytesIO, StringIO
 from datetime import datetime, timedelta
@@ -26,12 +27,12 @@ from django.core.cache import caches
 from django.conf import settings
 from django.apps import apps as django_apps
 
-from .models import CustomAbstractModel, Unit, Currency, Country, Region, City, Nds, CompanyType, Company, SalePoint, Manufacturer, ProductModel, BarCode, QrCode, Product
+from .models import Unit, Currency, Country, Region, City, Tax, CompanyType, Company, SalePoint, Manufacturer, ProductModel, BarCode, QrCode, Product, DocType
 from users.models import User
 
 def get_model(app_model):
-	app_name, model_name = app_model.split('.')
-	return django_apps.get_app_config(app_name).get_model(model_name)
+    app_name, model_name = app_model.split('.')
+    return django_apps.get_app_config(app_name).get_model(model_name)
 
 def get_queryset_by_company(super, request):
     qs = super.get_queryset(request)
@@ -111,13 +112,13 @@ class CurrencyFilter(DropDownFilter):
             return queryset.filter(currency=self.value())
 
 
-class NdsFilter(DropDownFilter):
-    title = _('Nds')
-    parameter_name = 'nds'
+class TaxFilter(DropDownFilter):
+    title = _('Tax')
+    parameter_name = 'tax'
 
     def lookups(self, request, model_admin):
         res = []
-        queryset = Nds.objects.only('id', 'name')
+        queryset = Tax.objects.only('id', 'name')
         for it in queryset:
             res.append((it.id, it.name))
         return res
@@ -126,7 +127,7 @@ class NdsFilter(DropDownFilter):
         if not self.value():
             return queryset
         else:
-            return queryset.filter(nds=self.value())
+            return queryset.filter(tax=self.value())
 
 
 class ProductModelFilter(DropDownFilter):
@@ -281,11 +282,11 @@ class CurrencyAdmin(CustomModelAdmin):
 admin.site.register(Currency, CurrencyAdmin)
 
 
-class NdsAdmin(CustomModelAdmin):
+class TaxAdmin(CustomModelAdmin):
     list_display = ('id', 'name', 'alias', 'value')
     list_display_links = ('name',)
     search_fields = ('id', 'name', 'alias', 'value')
-admin.site.register(Nds, NdsAdmin)
+admin.site.register(Tax, TaxAdmin)
 
 
 class CountryAdmin(CustomModelAdmin):
@@ -336,6 +337,13 @@ class CompanyTypeAdmin(CustomModelAdmin):
     list_display_links = ('id', 'name')
     search_fields = ('id', 'name')
 admin.site.register(CompanyType, CompanyTypeAdmin)
+
+
+class DocTypeAdmin(CustomModelAdmin):
+    list_display = ('id', 'alias', 'name', 'income', 'description')
+    list_display_links = ('id', 'alias', 'name')
+    search_fields = ('id', 'alias', 'name', 'description')
+admin.site.register(DocType, DocTypeAdmin)
 
 
 class CompanyAdmin(CustomModelAdmin):
@@ -411,17 +419,27 @@ class ProductAdmin(CustomModelAdmin):
     list_display = ('id', 'article', 'name', 'get_barcodes', 'get_qrcodes', 'get_cost', 'get_price', 'count', 'extinfo')
     list_display_links = ('id', 'article', 'name')
     search_fields = ('name', 'article', 'extinfo', 'barcodes__value', 'qrcodes__value')
-    list_select_related = ('nds', 'model')
-    list_filter = (NdsFilter, ProductModelFilter)
+    list_select_related = ('tax', 'model')
+    list_filter = (TaxFilter, ProductModelFilter)
     actions = ('from_xls', 'to_xls', 'barcode_generator')
 
     def get_cost(self, obj):
-        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', obj.cost.quantize(Decimal('0.00')), obj.currency.name if obj.currency else '')
+        try:
+            value = get_model('core.Register').objects.filter(rec__product_id=obj.id).order_by('-rec__doc__registered_at').first().rec.cost
+        except Exception as e:
+            self.loge(e)
+            value = obj.cost
+        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', value, obj.currency.name if obj.currency else '')
     get_cost.short_description = _('cost')
     get_cost.admin_order_field = 'cost'
 
     def get_price(self, obj):
-        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', obj.price.quantize(Decimal('0.00')), obj.currency.name if obj.currency else '')
+        try:
+            value = get_model('core.Register').objects.filter(rec__product_id=obj.id).order_by('-rec__doc__registered_at').first().rec.price
+        except Exception as e:
+            self.loge(e)
+            value = obj.price
+        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', value.quantize(Decimal('0.00')), obj.currency.name if obj.currency else '')
     get_price.short_description = _('price')
     get_price.admin_order_field = 'price'
 
@@ -450,7 +468,7 @@ class ProductAdmin(CustomModelAdmin):
     get_qrcodes.short_description = _('Qr Codes')
 
     def count(self, obj):
-        result = 0#get_model('core.Register').objects.filter(product_id=obj.id).count()
+        result = get_model('core.Register').objects.filter(rec__product_id=obj.id).aggregate(Max('rec__count', default=0))['rec__count__max']
         return format_html('<p><font color="green" face="Verdana, Geneva, sans-serif"><a href="{}/core/register/?product={}" target="_blank">{}</a></font></p>', settings.ADMIN_PATH_PREFIX, obj.id, result)
     count.short_description = _('Count')
 
