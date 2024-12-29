@@ -347,7 +347,7 @@ admin.site.register(DocType, DocTypeAdmin)
 
 
 class CompanyAdmin(CustomModelAdmin):
-    list_display = ('id', 'name', 'created_date', 'get_type', 'currency')
+    list_display = ('id', 'name', 'created_date', 'type', 'currency')
     list_display_links = ['id', 'name']
     search_fields = ['id', 'name', 'created_date', 'type__name',  'currency__name', 'currency__alias']
     list_select_related = ['type']
@@ -360,14 +360,6 @@ class CompanyAdmin(CustomModelAdmin):
         if not user.is_superuser:
             qs = qs.filter(Q(pk__in=user.companies.values_list('id', flat=True)) | Q(pk__in=user.sale_points.values_list('company_id', flat=True))).distinct()
         return qs
-
-    def get_type(self, obj):
-        if obj.sd:
-            return format_html(f'''<p><font color="green" face="Verdana, Geneva, sans-serif"><a href="https://support.telemetry.work/back/admin/core/company/?id={obj.sd}" target="_blank">{obj.sd}</a></font></p>''')
-        else:
-            return ''
-    get_type.short_description = _('Company Type')
-    get_type.admin_order_field = 'type'
 
 admin.site.register(Company, CompanyAdmin)
 
