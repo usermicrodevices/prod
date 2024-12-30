@@ -399,7 +399,7 @@ class UserAdmin(BaseUserAdmin):
         context['site_title'] = _('Users')
         context['is_popup'] = True
         context['is_nav_sidebar_enabled'] = True
-        context['site_header'] = _('Support')
+        context['site_header'] = _('Admin panel')
         context['has_permission'] = True
         context['site_url'] = reverse('admin:{}_{}_changelist'.format(m.app_label, m.model_name))
         context['available_apps'] = (m.app_label,)

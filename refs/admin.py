@@ -16,7 +16,7 @@ from django.contrib import admin, messages
 from django import forms
 from django.http import StreamingHttpResponse, FileResponse, HttpResponseRedirect
 from django.contrib.auth.forms import ReadOnlyPasswordHashField
-from django.db.models import F, Q, Min, Max, Value, Count, IntegerField, TextField, CharField, OuterRef, Subquery
+from django.db.models import F, Q, Min, Max, Sum, When, Value, Count, IntegerField, TextField, CharField, OuterRef, Subquery
 from django.db.models.query import QuerySet
 from django.db import connections
 from django.contrib.admin.models import LogEntry
@@ -27,7 +27,7 @@ from django.core.cache import caches
 from django.conf import settings
 from django.apps import apps as django_apps
 
-from .models import Unit, Currency, Country, Region, City, Tax, CompanyType, Company, SalePoint, Manufacturer, ProductModel, BarCode, QrCode, Product, DocType
+from .models import Unit, Currency, Country, Region, City, Tax, CompanyType, Company, SalePoint, Manufacturer, ProductModel, BarCode, QrCode, DocType, ProductGroup, Product
 from users.models import User
 
 def get_model(app_model):
@@ -229,13 +229,49 @@ class SalePointFilter(DropDownFilter):
             return queryset.filter(sale_point=self.value())
 
 
-class QrcodeFilter(DropDownFilter):
-    title = _('Qrcode')
+class BarCodeFilter(DropDownFilter):
+    title = _('BarCode')
+    parameter_name = 'barcodes__in'
+
+    def lookups(self, request, model_admin):
+        res = []
+        queryset = BarCode.objects.only('id')
+        for it in queryset:
+            res.append((it.id, it.id))
+        return res
+
+    def queryset(self, request, queryset):
+        if not self.value():
+            return queryset
+        else:
+            return queryset.filter(barcodes__in=[self.value()])
+
+
+class QrCodeFilter(DropDownFilter):
+    title = _('QrCode')
     parameter_name = 'qrcodes__in'
 
     def lookups(self, request, model_admin):
         res = []
-        queryset = Qrcode.objects.only('id', 'value')
+        queryset = QrCode.objects.only('id')
+        for it in queryset:
+            res.append((it.id, it.id))
+        return res
+
+    def queryset(self, request, queryset):
+        if not self.value():
+            return queryset
+        else:
+            return queryset.filter(qrcodes__in=[self.value()])
+
+
+class ProductGroupFilter(DropDownFilter):
+    title = _('Product Group')
+    parameter_name = 'group'
+
+    def lookups(self, request, model_admin):
+        res = []
+        queryset = ProductGroup.objects.only('id', 'name')
         for it in queryset:
             res.append((it.id, it.name))
         return res
@@ -244,7 +280,43 @@ class QrcodeFilter(DropDownFilter):
         if not self.value():
             return queryset
         else:
-            return queryset.filter(qrcodes__in=[self.value()])
+            return queryset.filter(group=self.value())
+
+
+class ProductManufacturerFilter(DropDownFilter):
+    title = _('Product Manufacturer')
+    parameter_name = 'model__manufacturer'
+
+    def lookups(self, request, model_admin):
+        res = []
+        queryset = Manufacturer.objects.only('id', 'name')
+        for it in queryset:
+            res.append((it.id, it.name))
+        return res
+
+    def queryset(self, request, queryset):
+        if not self.value():
+            return queryset
+        else:
+            return queryset.filter(model__manufacturer=self.value())
+
+
+class DocTypeFilter(DropDownFilter):
+    title = _('Doc Type')
+    parameter_name = 'type'
+
+    def lookups(self, request, model_admin):
+        res = []
+        queryset = DocType.objects.only('id', 'name')
+        for it in queryset:
+            res.append((it.id, it.name))
+        return res
+
+    def queryset(self, request, queryset):
+        if not self.value():
+            return queryset
+        else:
+            return queryset.filter(type=self.value())
 
 
 class CustomModelAdmin(admin.ModelAdmin):
@@ -394,74 +466,227 @@ admin.site.register(SalePoint, SalePointAdmin)
 
 
 class BarCodeAdmin(CustomModelAdmin):
-    list_display = ['value']
-    list_display_links = ['value']
-    search_fields = ['value']
+    list_display = ['id']
+    list_display_links = ['id']
+    search_fields = ['id']
 admin.site.register(BarCode, BarCodeAdmin)
 
 
 class QrCodeAdmin(CustomModelAdmin):
-    list_display = ['value']
-    list_display_links = ['value']
-    search_fields = ['value']
+    list_display = ['id']
+    list_display_links = ['id']
+    search_fields = ['id']
 admin.site.register(QrCode, QrCodeAdmin)
 
 
+class ProductGroupAdmin(CustomModelAdmin):
+    list_display = ('id', 'name', 'alias', 'description')
+    list_display_links = ('id', 'name', 'alias')
+    search_fields = ('id', 'name', 'alias', 'description')
+admin.site.register(ProductGroup, ProductGroupAdmin)
+
+
 class ProductAdmin(CustomModelAdmin):
-    list_display = ('id', 'article', 'name', 'get_barcodes', 'get_qrcodes', 'get_cost', 'get_price', 'count', 'extinfo')
+    __last_register__ = None
+    list_display = ('id', 'article', 'name', 'get_barcodes', 'get_qrcodes', 'get_cost', 'get_price', 'count', 'get_tax', 'get_model', 'get_group', 'extinfo')
     list_display_links = ('id', 'article', 'name')
-    search_fields = ('name', 'article', 'extinfo', 'barcodes__value', 'qrcodes__value')
-    list_select_related = ('tax', 'model')
-    list_filter = (TaxFilter, ProductModelFilter)
+    search_fields = ('name', 'article', 'extinfo', 'barcodes__id', 'qrcodes__id', 'group__name')
+    list_select_related = ('tax', 'model', 'group')
+    list_filter = (ProductGroupFilter, ProductManufacturerFilter, ProductModelFilter, TaxFilter)
+    autocomplete_fields = ('tax', 'model', 'group', 'barcodes', 'qrcodes')
     actions = ('from_xls', 'to_xls', 'barcode_generator')
 
+    #class Media:
+        #js = ['admin/js/autocomplete.js', 'admin/js/vendor/select2/select2.full.js']
+
     def get_cost(self, obj):
-        try:
-            value = get_model('core.Register').objects.filter(rec__product_id=obj.id).order_by('-rec__doc__registered_at').first().rec.cost
-        except Exception as e:
-            self.loge(e)
-            value = obj.cost
+        if not self.__last_register__:
+            try:
+                self.__last_register__ = get_model('core.Register').objects.filter(rec__product_id=obj.id).order_by('-rec__doc__registered_at').first()
+            except Exception as e:
+                self.loge(e)
+        value = obj.cost
+        if self.__last_register__:
+            value = self.__last_register__.rec.cost
         return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', value, obj.currency.name if obj.currency else '')
     get_cost.short_description = _('cost')
     get_cost.admin_order_field = 'cost'
 
     def get_price(self, obj):
-        try:
-            value = get_model('core.Register').objects.filter(rec__product_id=obj.id).order_by('-rec__doc__registered_at').first().rec.price
-        except Exception as e:
-            self.loge(e)
-            value = obj.price
+        if not self.__last_register__:
+            try:
+                self.__last_register__ = get_model('core.Register').objects.filter(rec__product_id=obj.id).order_by('-rec__doc__registered_at').first()
+            except Exception as e:
+                self.loge(e)
+        value = obj.price
+        if self.__last_register__:
+            value = self.__last_register__.rec.price
         return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', value.quantize(Decimal('0.00')), obj.currency.name if obj.currency else '')
     get_price.short_description = _('price')
     get_price.admin_order_field = 'price'
 
     def get_barcodes(self, obj):
         try:
-            idxs = BarCode.objects.filter(product__in=[obj]).annotate(admin_path_prefix=Value(settings.ADMIN_PATH_PREFIX, CharField())).values_list('admin_path_prefix', 'value')
+            idxs = BarCode.objects.filter(product__in=[obj]).annotate(admin_path_prefix=Value(settings.ADMIN_PATH_PREFIX, CharField())).values_list('admin_path_prefix', 'id')
         except Exception as e:
             return ''
         else:
             if not idxs:
                 return ''
-            content = format_html_join('\n', '<p><font color="green" face="Verdana, Geneva, sans-serif"><a href="{0}/refs/barcode/?value={1}" target="_blank">{1}</a></font></p>', idxs)
+            content = format_html_join('\n', '<p><font color="green" face="Verdana, Geneva, sans-serif"><a href="{0}/refs/barcode/?id={1}" target="_blank">{1}</a></font></p>', idxs)
             return format_html('<details><summary>{}</summary>{}</details>', idxs[0][1], content)
     get_barcodes.short_description = _('Bar Codes')
 
     def get_qrcodes(self, obj):
         try:
-            idxs = QrCode.objects.filter(product__in=[obj]).annotate(admin_path_prefix=Value(settings.ADMIN_PATH_PREFIX, CharField())).values_list('admin_path_prefix', 'value')
+            idxs = QrCode.objects.filter(product__in=[obj]).annotate(admin_path_prefix=Value(settings.ADMIN_PATH_PREFIX, CharField())).values_list('admin_path_prefix', 'id')
         except Exception as e:
             return ''
         else:
             if not idxs:
                 return ''
-            content = format_html_join('\n', '<p><font color="green" face="Verdana, Geneva, sans-serif"><a href="{0}/refs/qrcode/?value={1}" target="_blank">{1}</a></font></p>', idxs)
+            content = format_html_join('\n', '<p><font color="green" face="Verdana, Geneva, sans-serif"><a href="{0}/refs/qrcode/?id={1}" target="_blank">{1}</a></font></p>', idxs)
             return format_html('<details><summary>{}</summary>{}</details>', idxs[0][1], content)
     get_qrcodes.short_description = _('Qr Codes')
 
     def count(self, obj):
-        result = get_model('core.Register').objects.filter(rec__product_id=obj.id).aggregate(Max('rec__count', default=0))['rec__count__max']
-        return format_html('<p><font color="green" face="Verdana, Geneva, sans-serif"><a href="{}/core/register/?product={}" target="_blank">{}</a></font></p>', settings.ADMIN_PATH_PREFIX, obj.id, result)
+        SumIncome=Sum('rec__count', filter=Q(rec__doc__type__income=True), default=0)
+        SumExpense=Sum('rec__count', filter=Q(rec__doc__type__income=False), default=0)
+        result = get_model('core.Register').objects.filter(rec__product_id=obj.id).aggregate(count=SumIncome-SumExpense)['count']
+        color = 'green' if result > 0 else 'red'
+        return format_html('<p><a href="{}/core/register/?rec__product={}" target="_blank" style="color:{}">{}</a></p>', settings.ADMIN_PATH_PREFIX, obj.id, color, result)
     count.short_description = _('Count')
+
+    def get_tax(self, obj):
+        o = obj.tax
+        if not o:
+            return ''
+        m = o._meta
+        return format_html('<a href="{}?id={}" target="_blank">{}</a>', reverse(f'admin:{m.app_label}_{m.model_name}_changelist'), o.id, o.name)
+    get_tax.short_description = _('Tax')
+    get_tax.admin_order_field = 'tax'
+
+    def get_model(self, obj):
+        o = obj.model
+        if not o:
+            return ''
+        m = o._meta
+        return format_html('<a href="{}?id={}" target="_blank">{}</a>', reverse(f'admin:{m.app_label}_{m.model_name}_changelist'), o.id, o.name)
+    get_model.short_description = _('Model')
+    get_model.admin_order_field = 'model'
+
+    def get_group(self, obj):
+        o = obj.group
+        if not o:
+            return ''
+        m = o._meta
+        return format_html('<a href="{}?id={}" target="_blank">{}</a>', reverse(f'admin:{m.app_label}_{m.model_name}_changelist'), o.id, o.name)
+    get_group.short_description = _('Product Group')
+    get_group.admin_order_field = 'group'
+
+    def from_xls(self, request, queryset, **kwargs):
+        import xlsxwriter
+        from transliterate import slugify
+        from openpyxl import load_workbook
+        form = None
+        if 'apply' in request.POST:
+            self.logi('💡', request.FILES)
+            form = UploadFileForm(request.POST, request.FILES)
+            if form.is_valid():
+                msg_err = ''
+                count_created = 0
+                file = form.cleaned_data['file']
+                if file:
+                    units, groups, ext_attrs, products = {}, {}, {}, []
+                    wb = load_workbook(file)
+                    for sheetname in wb.sheetnames:
+                        self.logi('💡SHEET NAME', sheetname)
+                        ws = wb[sheetname]
+                        list_rows = list(ws.rows)
+                        prefix_cells = list_rows[0]
+                        self.logi(prefix_cells)
+                        row_index = 0
+                        for row in list_rows[1:]:
+                            row_index += 1
+                            v = list(row)
+                            try:
+                                p_group, p_code, p_name, p_article, p_unit, p_price, p_cost, p_barcode, p_count = [i.value for i in v]
+                            except Exception as e:
+                                self.loge(e)
+                                msg_err += f'ROW {row_index}: {e}'
+                            else:
+                                if Product.objects.filter(article=p_article).exists():
+                                    self.logi('PRODUCT', p_article, p_name, 'EXISTS')
+                                else:
+                                    product_kwargs = {'article':p_article, 'name':p_name, 'cost':p_cost, 'price':p_price}
+                                    if p_unit:
+                                        if p_unit not in units:
+                                            units[p_unit], created_unit = Unit.objects.get_or_create(name__icontains=p_unit, defaults={'label':p_unit, 'name':p_unit})
+                                        product_kwargs['unit'] = units[p_unit]
+                                    if p_group:
+                                        if p_group not in groups:
+                                            groups[p_group], created_group = ProductGroup.objects.get_or_create(name__icontains=p_group, defaults={'name':p_group})
+                                        product_kwargs['group'] = groups[p_group]
+                                    products.append(Product(**product_kwargs))
+                                    ext_attrs[p_article] = {'barcode':f'{p_barcode}', 'count':p_count}
+                    if products:
+                        try:
+                            objs = Product.objects.bulk_create(products)
+                        except Exception as e:
+                            self.loge(e)
+                            msg_err = f'{e}'
+                        else:
+                            count_created = len(objs)
+                            doc_income, income_mybe_saved = None, True
+                            if count_created:
+                                for o in objs:
+                                    barcode = ext_attrs[o.article]['barcode']
+                                    if barcode:
+                                        b, created = BarCode.objects.get_or_create(id=barcode)
+                                        if b:
+                                            o.barcodes.add(b)
+                                    p_count = ext_attrs[o.article]['count']
+                                    if p_count and income_mybe_saved:
+                                        if not doc_income:
+                                            t, created = DocType.objects.get_or_create(alias='balance', defaults={'alias':'balance', 'name':'Balance'})
+                                            doc_income = get_model('core.Doc')(type=t, author=request.user)
+                                            try:
+                                                doc_income.save()
+                                            except Exception as e:
+                                                self.loge(e)
+                                                income_mybe_saved = False
+                                                doc_income = None
+                                        if doc_income:
+                                            r = get_model('core.Record')(count=p_count, cost=o.cost, price=o.price, doc=doc_income, product=o)
+                                            try:
+                                                r.save()
+                                            except Exception as e:
+                                                self.loge(e)
+                                            else:
+                                                try:
+                                                    get_model('core.Register')(rec=r).save()
+                                                except Exception as e:
+                                                    self.loge(e)
+                self.message_user(request, f'🆗 {file.name} ✏️ FILE SIZE={file.size} ✏️ CREATED={count_created}; {msg_err}', messages.SUCCESS)
+                return HttpResponseRedirect(request.get_full_path())
+        if not form:
+            form = UploadFileForm(initial={'_selected_action': request.POST.getlist(admin.helpers.ACTION_CHECKBOX_NAME)})
+        m = queryset.model._meta
+        context = {}
+        context['items'] = []
+        context['form'] = form
+        context['title'] = _('File')
+        context['current_action'] = sys._getframe().f_code.co_name
+        context['subtitle'] = 'admin_select_file_form'
+        context['site_title'] = queryset.model._meta.verbose_name
+        context['is_popup'] = True
+        context['is_nav_sidebar_enabled'] = True
+        context['site_header'] = _('Admin panel')
+        context['has_permission'] = True
+        context['site_url'] = reverse('admin:{}_{}_changelist'.format(m.app_label, m.model_name))
+        context['available_apps'] = (m.app_label,)
+        context['app_label'] = m.app_label
+        return render(request, 'admin_select_file_form.html', context)
+    from_xls.short_description = f'⚔{_("load from XLS file")}🔙'
 
 admin.site.register(Product, ProductAdmin)

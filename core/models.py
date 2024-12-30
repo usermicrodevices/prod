@@ -83,13 +83,16 @@ class Doc(models.Model):
     type = models.ForeignKey('refs.DocType', default=1, null=False, blank=False, on_delete=models.CASCADE, verbose_name=_('type'), help_text=_('type of document'))
     tax = models.ForeignKey('refs.Tax', default=1, null=False, blank=False, on_delete=models.CASCADE, verbose_name=_('tax'), help_text=_('tax of document'))
     sale_point = models.ForeignKey('refs.SalePoint', default=None, null=True, blank=True, on_delete=models.SET_NULL, verbose_name=_('sale point'), help_text=_('sale point of document'))
-    author = models.ForeignKey('users.User', default=1, null=False, blank=False, on_delete=models.CASCADE, verbose_name=_('author'), help_text=_('author of document'))
+    author = models.ForeignKey('users.User', default=1, null=False, blank=False, editable=False, on_delete=models.CASCADE, verbose_name=_('author'), help_text=_('author of document'))
     extinfo = JSONField(default=dict, blank=True)
 
     class Meta:
         verbose_name = f'📄{_("Doc")}'
         verbose_name_plural = f'📄{_("Docs")}'
         ordering = ['-registered_at']
+
+    def __str__(self):
+        return f'[{self.id}]{self.type.name}'
 
 
 class Record(models.Model):
