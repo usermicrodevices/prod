@@ -5,7 +5,7 @@ SECRET_KEY = 'dummy-key-require-replaced-in-production'
 
 DEBUG = True
 
-ALLOWED_HOSTS = ['127.0.0.1']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '192.168.0.1']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -94,6 +94,9 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

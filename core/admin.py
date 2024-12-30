@@ -69,6 +69,15 @@ class DocAdmin(CustomModelAdmin):
     list_display_links = ('id', 'created_at', 'registered_at')
     search_fields = ('id', 'created_at', 'registered_at', 'owner__name', 'contractor__name', 'type__name', 'tax__name', 'sale_point__name', 'author__username', 'extinfo')
 
+    def save_model(self, request, instance, form, change):
+        current_user = request.user
+        instance = form.save(commit=False)
+        if not change or not instance.author:
+            instance.author = current_user
+        instance.save()
+        form.save_m2m()
+        return instance
+
     def get_records(self, obj):
         try:
             idxs = Record.objects.filter(doc=obj).annotate(admin_path_prefix=Value(settings.ADMIN_PATH_PREFIX, CharField())).values_list('admin_path_prefix', 'product_id', 'product__name')
@@ -85,9 +94,15 @@ admin.site.register(Doc, DocAdmin)
 
 
 class RecordAdmin(CustomModelAdmin):
-    list_display = ('id', 'count', 'get_cost', 'get_price', 'doc', 'product', 'extinfo')
+    list_display = ('id', 'product', 'get_count', 'get_cost', 'get_price', 'doc', 'extinfo')
     list_display_links = ('id',)
     search_fields = ('id', 'doc__owner__name', 'doc__contractor__name', 'doc__type__name', 'doc__tax__name', 'doc__sale_point__name', 'doc__author__username', 'extinfo')
+
+    def get_count(self, obj):
+        color = 'green' if obj.doc.type.income==True else 'red'
+        return format_html('<font color="{}" face="Verdana, Geneva, sans-serif">{}</font>', color, obj.count)
+    get_count.short_description = _('count')
+    get_count.admin_order_field = 'count'
 
     def get_cost(self, obj):
         return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', obj.cost.quantize(Decimal('0.00')), obj.currency.name if obj.currency else '')
@@ -103,7 +118,30 @@ admin.site.register(Record, RecordAdmin)
 
 
 class RegisterAdmin(CustomModelAdmin):
-    list_display = ('id', 'rec')
+    list_display = ('id', 'rec', 'get_product', 'get_count', 'get_cost', 'get_price', 'get_doc')
     list_display_links = ('id',)
     search_fields = ('id', 'rec__doc__owner__name', 'rec__doc__contractor__name', 'rec__doc__type__name')
+    list_filter = ('rec__product', 'rec__doc', 'rec__doc__type')
+
+    def get_product(self, obj):
+        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{}</font>', obj.rec.product)
+    get_product.short_description = _('product')
+
+    def get_count(self, obj):
+        color = 'green' if obj.rec.doc.type.income==True else 'red'
+        return format_html('<font color="{}" face="Verdana, Geneva, sans-serif">{}</font>', color, obj.rec.count)
+    get_count.short_description = _('count')
+
+    def get_cost(self, obj):
+        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', obj.rec.cost.quantize(Decimal('0.00')), obj.rec.currency.name if obj.rec.currency else '')
+    get_cost.short_description = _('cost')
+
+    def get_price(self, obj):
+        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', obj.rec.price.quantize(Decimal('0.00')), obj.rec.currency.name if obj.rec.currency else '')
+    get_price.short_description = _('price')
+
+    def get_doc(self, obj):
+        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{}</font>', obj.rec.doc)
+    get_doc.short_description = _('document')
+
 admin.site.register(Register, RegisterAdmin)

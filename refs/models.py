@@ -234,27 +234,48 @@ class SalePoint(models.Model):
 
 
 class BarCode(models.Model):
-    value = models.CharField(primary_key=True, max_length=191, unique=True, default=uuid4, null=False, blank=False, verbose_name=_('value'), help_text=_('product barcode'))
+    id = models.CharField(primary_key=True, max_length=191, unique=True, default=uuid4, null=False, blank=False, verbose_name=_('value'), help_text=_('product barcode'))
 
     class Meta:
         verbose_name = f'Ⅲ{_("Bar Code")}'
         verbose_name_plural = f'Ⅲ{_("Bar Codes")}'
-        ordering = ['value']
-
-    def __str__(self):
-        return self.value
 
 
 class QrCode(models.Model):
-    value = models.CharField(primary_key=True, max_length=191, unique=True, default=uuid4, null=False, blank=False, verbose_name=_('value'), help_text=_('product qrcode'))
+    id = models.CharField(primary_key=True, max_length=191, unique=True, default=uuid4, null=False, blank=False, verbose_name=_('value'), help_text=_('product qrcode'))
 
     class Meta:
         verbose_name = f'𝍌{_("Qr Code")}'
         verbose_name_plural = f'𝍌{_("Qr Codes")}'
-        ordering = ['value']
+
+
+class DocType(models.Model):
+    alias = models.CharField(max_length=191, unique=True, default='receipt', null=False, blank=False)
+    name = models.CharField(max_length=191, default=_('Receipt'), verbose_name=_('name'), help_text=_('name of type document'))
+    income = models.BooleanField(default=True, null=False, blank=False, verbose_name=_('income'), help_text=_('income or expense'))
+    description = models.CharField(max_length=191, default=None, null=True, blank=True, verbose_name=_('description'), help_text=_('description of type document'))
 
     def __str__(self):
-        return self.value
+        return self.name
+
+    class Meta:
+        verbose_name = f'🗂️{_("Doc Type")}'
+        verbose_name_plural = f'🗂️{_("Doc Types")}'
+        ordering = ['name']
+
+
+class ProductGroup(models.Model):
+    name = models.CharField(max_length=191, unique=True, default=_('Products'), verbose_name=_('name'), help_text=_('name of products group'))
+    alias = models.CharField(max_length=191, default=None, null=True, blank=True, verbose_name=_('alias'), help_text=_('alias of products group'))
+    description = models.CharField(max_length=191, default=None, null=True, blank=True, verbose_name=_('description'), help_text=_('description of products group'))
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = f'🗂️{_("Product Group")}'
+        verbose_name_plural = f'🗂️{_("Product Groups")}'
+        ordering = ['name']
 
 
 class Product(models.Model):
@@ -268,6 +289,7 @@ class Product(models.Model):
     tax = models.ForeignKey(Tax, default=None, null=True, blank=True, on_delete=models.SET_NULL, verbose_name=_('tax'), help_text=_('default tax'))
     barcodes = models.ManyToManyField(BarCode, default=None, blank=True, verbose_name=_('barcodes'), help_text=_('list barcodes of product'))
     qrcodes = models.ManyToManyField(QrCode, default=None, blank=True, verbose_name=_('qrcodes'), help_text=_('list qrcodes of product'))
+    group = models.ForeignKey(ProductGroup, default=None, null=True, blank=True, on_delete=models.SET_NULL)
     extinfo = JSONField(default=dict, blank=True)
 
     class Meta:
@@ -278,18 +300,3 @@ class Product(models.Model):
 
     def __str__(self):
         return self.name
-
-
-class DocType(models.Model):
-    alias = models.CharField(max_length=191, unique=True, default='receipt', null=False, blank=False)
-    name = models.CharField(max_length=191, default=_('Receipt'), verbose_name=_('name'), help_text=_('name of type document'))
-    income = models.BooleanField(default=True, null=False, blank=False, verbose_name=_('income'), help_text=_('income or expense'))
-    description = models.CharField(max_length=191, default=None, null=True, blank=True, verbose_name=_('description'), help_text=_('description of type document'))
-
-    def __str__(self):
-        return self.alias
-
-    class Meta:
-        verbose_name = f'🗂️{_("Doc Type")}'
-        verbose_name_plural = f'🗂️{_("Doc Types")}'
-        ordering = ['name']
