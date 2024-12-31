@@ -1,4 +1,4 @@
-import logging, sys
+import logging, sys, time
 from decimal import Decimal
 from io import BytesIO, StringIO
 from datetime import datetime, timedelta
@@ -598,6 +598,7 @@ class ProductAdmin(CustomModelAdmin):
                 file = form.cleaned_data['file']
                 if file:
                     units, groups, ext_attrs, products = {}, {}, {}, []
+                    timestamp = int(time.time())
                     wb = load_workbook(file)
                     for sheetname in wb.sheetnames:
                         self.logi('💡SHEET NAME', sheetname)
@@ -618,17 +619,30 @@ class ProductAdmin(CustomModelAdmin):
                                 if Product.objects.filter(article=p_article).exists():
                                     self.logi('PRODUCT', p_article, p_name, 'EXISTS')
                                 else:
-                                    product_kwargs = {'article':p_article, 'name':p_name, 'cost':p_cost, 'price':p_price}
+                                    product_kwargs = {'article':p_article if p_article else f'{timestamp+row_index}', 'name':p_name, 'cost':p_cost if isinstance(p_cost, (int, float)) else 0, 'price':p_price if isinstance(p_price, (int, float)) else 0}
                                     if p_unit:
                                         if p_unit not in units:
-                                            units[p_unit], created_unit = Unit.objects.get_or_create(name__icontains=p_unit, defaults={'label':p_unit, 'name':p_unit})
-                                        product_kwargs['unit'] = units[p_unit]
+                                            condition_unit = Q(label=p_unit) | Q(label__icontains=p_unit)
+                                            condition_unit |= Q(name=p_unit) | Q(name__icontains=p_unit)
+                                            unit = Unit.objects.filter(condition_unit).first()
+                                            if not unit:
+                                                unit = Unit(label=p_unit, name=p_unit)
+                                                try:
+                                                    unit.save()
+                                                except Exception as e:
+                                                    self.loge(e)
+                                                    unit = None
+                                            if unit:
+                                            	units[p_unit] = unit
+                                        if p_unit not in units:
+                                            product_kwargs['unit'] = units[p_unit]
                                     if p_group:
                                         if p_group not in groups:
                                             groups[p_group], created_group = ProductGroup.objects.get_or_create(name__icontains=p_group, defaults={'name':p_group})
                                         product_kwargs['group'] = groups[p_group]
-                                    products.append(Product(**product_kwargs))
-                                    ext_attrs[p_article] = {'barcode':f'{p_barcode}', 'count':p_count}
+                                    p = Product(**product_kwargs)
+                                    products.append(p)
+                                    ext_attrs[p.article] = {'barcode':f'{p_barcode if p_barcode else (timestamp+row_index)*1000}', 'count':p_count}
                     if products:
                         try:
                             objs = Product.objects.bulk_create(products)

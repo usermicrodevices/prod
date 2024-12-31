@@ -1,0 +1,495 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-12-31 22:46+0300\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Product"
+msgstr "Товар"
+
+msgid "Products"
+msgstr "Товары"
+
+msgid "product"
+msgstr "товар"
+
+msgid "count"
+msgstr "количество"
+
+msgid "cost"
+msgstr "цена закупки"
+
+msgid "price"
+msgstr "цена продажи"
+
+msgid "document"
+msgstr "документ"
+
+msgid "created date"
+msgstr "дата создания"
+
+msgid "Date of creation"
+msgstr "Дата создания"
+
+msgid "registered date"
+msgstr "дата регистрации"
+
+msgid "Date of registration"
+msgstr "Дата регистрации"
+
+msgid "owner"
+msgstr "владелец"
+
+msgid "owner of document"
+msgstr "владелец документа"
+
+msgid "contractor"
+msgstr "контрагент"
+
+msgid "contractor of document"
+msgstr "контрагент документа"
+
+msgid "type"
+msgstr "тип"
+
+msgid "type of document"
+msgstr "тип документа"
+
+msgid "tax"
+msgstr "налог"
+
+msgid "tax of document"
+msgstr "налог документа"
+
+msgid "sale point"
+msgstr "точка продаж"
+
+msgid "sale point of document"
+msgstr "точка продаж документа"
+
+msgid "author"
+msgstr "автор"
+
+msgid "author of document"
+msgstr "автор документа"
+
+msgid "count of products"
+msgstr "количество товара"
+
+msgid "current cost"
+msgstr "текущая цена закупки"
+
+msgid "current price"
+msgstr "текущая цена продажи"
+
+msgid "refernce of document"
+msgstr "справочник документов"
+
+msgid "refernce of product"
+msgstr "справочник товаров"
+
+msgid "record"
+msgstr "запись"
+
+msgid "record of document"
+msgstr "запись документа"
+
+msgid "Country"
+msgstr "Страна"
+
+msgid "Countries"
+msgstr "Страны"
+
+msgid "Region"
+msgstr "Регион"
+
+msgid "Regions"
+msgstr "Регионы"
+
+msgid "City"
+msgstr "Город"
+
+msgid "Cities"
+msgstr "Города"
+
+msgid "Unit"
+msgstr "Еденица"
+
+msgid "Units"
+msgstr "Еденицы"
+
+msgid "Currency"
+msgstr "Валюта"
+
+msgid "Currencies"
+msgstr "Валюты"
+
+msgid "Tax"
+msgstr "Налог"
+
+msgid "Taxes"
+msgstr "Налоги"
+
+msgid "Manufacturer"
+msgstr "Производитель"
+
+msgid "Manufacturers"
+msgstr "Производители"
+
+msgid "Product Model"
+msgstr "Модель Товара"
+
+msgid "Product Models"
+msgstr "Модели Товаров"
+
+msgid "Company Type"
+msgstr "Тип Компании"
+
+msgid "Company Types"
+msgstr "Типы Компании"
+
+msgid "Company"
+msgstr "Компания"
+
+msgid "Companies"
+msgstr "Компании"
+
+msgid "Sale Point"
+msgstr "Точка Продаж"
+
+msgid "Sale Points"
+msgstr "Точки Продаж"
+
+msgid "Product Group"
+msgstr "Группа Товара"
+
+msgid "Product Groups"
+msgstr "Группы Товаров"
+
+msgid "Product Manufacturer"
+msgstr "Производитель Товара"
+
+msgid "Doc"
+msgstr "Документ"
+
+msgid "Docs"
+msgstr "Документы"
+
+msgid "Doc Type"
+msgstr "Тип Документа"
+
+msgid "Doc Types"
+msgstr "Типы Документов"
+
+msgid "Record"
+msgstr "Позиция документа"
+
+msgid "Records"
+msgstr "Позиции документов"
+
+msgid "Register"
+msgstr "Регистрация позиции"
+
+msgid "Registers"
+msgstr "Регистрации позиций"
+
+msgid "Bar Code"
+msgstr "Штрихкод"
+
+msgid "Bar Codes"
+msgstr "Штрихкоды"
+
+msgid "Qr Code"
+msgstr "Qr-код"
+
+msgid "Qr Codes"
+msgstr "Qr-коды"
+
+msgid "Count"
+msgstr "Количество"
+
+msgid "Model"
+msgstr "Модель"
+
+msgid "File"
+msgstr "Файл"
+
+msgid "Admin panel"
+msgstr "Панель администратора"
+
+msgid "label of unit"
+msgstr "метка единицы"
+
+msgid "name of unit"
+msgstr "название единицы"
+
+msgid "name"
+msgstr "название"
+
+msgid "alias"
+msgstr "альяс"
+
+msgid "value"
+msgstr "значение"
+
+msgid "percentage value of tax"
+msgstr "значение НДС в процентах"
+
+msgid "caption"
+msgstr "заголовок"
+
+msgid "Caption of manufacturer"
+msgstr "Название производителя"
+
+msgid "Caption of model"
+msgstr "Название модели"
+
+msgid "Type of company"
+msgstr "Тип компании"
+
+msgid "Caption of company"
+msgstr "Название компании"
+
+msgid "Date of creation on server"
+msgstr "Дата создания на сервере"
+
+msgid "contact people"
+msgstr "контактное лицо"
+
+msgid "Contact people of company"
+msgstr "Контактное лицо компании"
+
+msgid "phone"
+msgstr "телефон"
+
+msgid "Contact people phone of company"
+msgstr "Телефон контактного лица компании"
+
+msgid "email"
+msgstr "е-мейл"
+
+msgid "Email of company"
+msgstr "Email компании"
+
+msgid "company"
+msgstr "компания"
+
+msgid "Caption of object"
+msgstr "Название объекта"
+
+msgid "address"
+msgstr "адрес"
+
+msgid "Address of object"
+msgstr "Адрес объекта"
+
+msgid "map point"
+msgstr "координаты"
+
+msgid "Coords on map"
+msgstr "Координаты на карте"
+
+msgid "person"
+msgstr "персона"
+
+msgid "Person on object"
+msgstr "Ответственное лицо на объекте"
+
+msgid "Email on object"
+msgstr "Е-мейл на объекте"
+
+msgid "Phone on object"
+msgstr "Телефон на объекте"
+
+msgid "product barcode"
+msgstr "штрихкод товара"
+
+msgid "product qrcode"
+msgstr "qr-код товара"
+
+msgid "Receipt"
+msgstr "Поступление"
+
+msgid "name of type document"
+msgstr "название типа документа"
+
+msgid "income"
+msgstr "поступление"
+
+msgid "income or expense"
+msgstr "поступление или списание"
+
+msgid "description"
+msgstr "описание"
+
+msgid "description of type document"
+msgstr "описание типа документа"
+
+msgid "name of products group"
+msgstr "название группы товаров"
+
+msgid "alias of products group"
+msgstr "алиас группы товаров"
+
+msgid "description of products group"
+msgstr "описание группы товаров"
+
+msgid "article"
+msgstr "артикл"
+
+msgid "product article"
+msgstr "артикл товара"
+
+msgid "Caption of item"
+msgstr "Название элемента"
+
+msgid "default cost"
+msgstr "цена закупки по умолчанию"
+
+msgid "default price"
+msgstr "цена продажи по умолчанию"
+
+msgid "default tax"
+msgstr "дефолтный налог"
+
+msgid "barcodes"
+msgstr "штрихкоды"
+
+msgid "list barcodes of product"
+msgstr "список штрихкодов товара"
+
+msgid "qrcodes"
+msgstr "qr-коды"
+
+msgid "list qrcodes of product"
+msgstr "список qr-кодов товара"
+
+msgid "group"
+msgstr "группа"
+
+msgid "Staff"
+msgstr "Сотрудник"
+
+msgid "Login"
+msgstr "Логин"
+
+msgid "Group"
+msgstr "Группа"
+
+msgid "Groups"
+msgstr "Группы"
+
+msgid "Avatar"
+msgstr "Аватар"
+
+msgid "yes"
+msgstr "да"
+
+msgid "no"
+msgstr "нет"
+
+msgid "please select items"
+msgstr "выберите элементы"
+
+msgid "Name of people"
+msgstr "Имя"
+
+msgid "Family name"
+msgstr "Фамилия"
+
+msgid "Last of logged date"
+msgstr "Дата последней авторизации"
+
+msgid "Active"
+msgstr "Активен"
+
+msgid "Objects"
+msgstr "Объекты"
+
+msgid "unknown error"
+msgstr "неизвестная ошибка"
+
+msgid "not found users"
+msgstr "не найдены пользователи"
+
+msgid "application"
+msgstr "приложение"
+
+msgid "name of application"
+msgstr "название приложения"
+
+msgid "model"
+msgstr "модель"
+
+msgid "name of model"
+msgstr "название модели"
+
+msgid "weight"
+msgstr "вес"
+
+msgid "weight of role for setup priority"
+msgstr "вес роли для установки приоритета"
+
+msgid "field of model"
+msgstr "поле модели"
+
+msgid "companies"
+msgstr "компании"
+
+msgid "sale points"
+msgstr "точки продаж"
+
+msgid "contract finished date"
+msgstr "дата завершения договора"
+
+msgid "Date of contract finished"
+msgstr "Дата завершения договора"
+
+msgid "avatar"
+msgstr "аватар"
+
+msgid "image as BASE64"
+msgstr "картинка как BASE64"
+
+msgid "default company"
+msgstr "дефолтная компания"
+
+msgid "role"
+msgstr "роль"
+
+msgid "Role Model"
+msgstr "Модель Роли"
+
+msgid "Role Models"
+msgstr "Модели Ролей"
+
+msgid "Role"
+msgstr "Роль"
+
+msgid "Roles"
+msgstr "Роли"
+
+msgid "Role Field"
+msgstr "Поле Роли"
+
+msgid "Role Fields"
+msgstr "Поля Ролей"
+
+msgid "User"
+msgstr "Пользователь"
+
+msgid "Users"
+msgstr "Пользователи"
