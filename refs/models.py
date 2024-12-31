@@ -162,7 +162,7 @@ class Manufacturer(models.Model):
 
     class Meta:
         verbose_name = f'🖥️{_("Manufacturer")}'
-        verbose_name_plural = f'🖥️{_("Manufacturers")}'
+        verbose_name_plural = f'🖥️{_("Manufacturers")}'
         ordering = ['name']
 
 
