@@ -95,18 +95,24 @@ class DocAdmin(CustomModelAdmin):
     def get_sum_cost(self, obj):
         full_sum = 0
         try:
-            full_sum = Record.objects.filter(doc=obj).aggregate(full_sum=Sum(F('count')*F('cost')))['full_sum'].quantize(Decimal('0.00'))
+            full_sum = Record.objects.filter(doc=obj).aggregate(full_sum=Sum(F('count')*F('cost')))['full_sum']
         except Exception as e:
             self.loge(e)
+        else:
+            if full_sum:
+                full_sum = full_sum.quantize(Decimal('0.00'))
         return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{}</font>', full_sum)
     get_sum_cost.short_description = _('sum cost')
 
     def get_sum_price(self, obj):
         full_sum = 0
         try:
-            full_sum = Record.objects.filter(doc=obj).aggregate(full_sum=Sum(F('count')*F('price')))['full_sum'].quantize(Decimal('0.00'))
+            full_sum = Record.objects.filter(doc=obj).aggregate(full_sum=Sum(F('count')*F('price')))['full_sum']
         except Exception as e:
             self.loge(e)
+        else:
+            if full_sum:
+                full_sum = full_sum.quantize(Decimal('0.00'))
         return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{}</font>', full_sum)
     get_sum_price.short_description = _('sum price')
 
