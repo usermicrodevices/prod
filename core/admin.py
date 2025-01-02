@@ -1,3 +1,4 @@
+import logging, sys
 from decimal import Decimal
 from io import BytesIO, StringIO
 from datetime import datetime, timedelta
@@ -15,7 +16,7 @@ from django.contrib import admin, messages
 from django import forms
 from django.http import StreamingHttpResponse, FileResponse, HttpResponseRedirect
 from django.contrib.auth.forms import ReadOnlyPasswordHashField
-from django.db.models import F, Q, Min, Max, Value, Count, IntegerField, TextField, CharField, OuterRef, Subquery
+from django.db.models import F, Q, Min, Max, Sum, Value, Count, IntegerField, TextField, CharField, OuterRef, Subquery
 from django.db.models.query import QuerySet
 from django.db import connections
 from django.contrib.admin.models import LogEntry
@@ -65,7 +66,7 @@ class CustomModelAdmin(admin.ModelAdmin):
 
 
 class DocAdmin(CustomModelAdmin):
-    list_display = ('id', 'created_at', 'registered_at', 'owner', 'contractor', 'type', 'tax', 'author', 'get_records', 'extinfo')
+    list_display = ('id', 'created_at', 'registered_at', 'get_records', 'get_sum_cost', 'get_sum_price', 'owner', 'contractor', 'type', 'tax', 'author', 'extinfo')
     list_display_links = ('id', 'created_at', 'registered_at')
     search_fields = ('id', 'created_at', 'registered_at', 'owner__name', 'contractor__name', 'type__name', 'tax__name', 'sale_point__name', 'author__username', 'extinfo')
 
@@ -82,6 +83,7 @@ class DocAdmin(CustomModelAdmin):
         try:
             idxs = Record.objects.filter(doc=obj).annotate(admin_path_prefix=Value(settings.ADMIN_PATH_PREFIX, CharField())).values_list('admin_path_prefix', 'product_id', 'product__name')
         except Exception as e:
+            self.loge(e)
             return ''
         else:
             if not idxs:
@@ -90,13 +92,35 @@ class DocAdmin(CustomModelAdmin):
             return format_html('<details><summary>{}</summary>{}</details>', idxs[0][2], content)
     get_records.short_description = _('Products')
 
+    def get_sum_cost(self, obj):
+        full_sum = 0
+        try:
+            full_sum = Record.objects.filter(doc=obj).aggregate(full_sum=Sum(F('count')*F('cost')))['full_sum'].quantize(Decimal('0.00'))
+        except Exception as e:
+            self.loge(e)
+        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{}</font>', full_sum)
+    get_sum_cost.short_description = _('sum cost')
+
+    def get_sum_price(self, obj):
+        full_sum = 0
+        try:
+            full_sum = Record.objects.filter(doc=obj).aggregate(full_sum=Sum(F('count')*F('price')))['full_sum'].quantize(Decimal('0.00'))
+        except Exception as e:
+            self.loge(e)
+        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{}</font>', full_sum)
+    get_sum_price.short_description = _('sum price')
+
 admin.site.register(Doc, DocAdmin)
 
 
 class RecordAdmin(CustomModelAdmin):
-    list_display = ('id', 'product', 'get_count', 'get_cost', 'get_price', 'doc', 'extinfo')
+    list_display = ('id', 'get_product', 'get_cost', 'get_price', 'get_count', 'get_sum_cost', 'get_sum_price', 'doc', 'extinfo')
     list_display_links = ('id',)
     search_fields = ('id', 'doc__owner__name', 'doc__contractor__name', 'doc__type__name', 'doc__tax__name', 'doc__sale_point__name', 'doc__author__username', 'extinfo')
+
+    def get_product(self, obj):
+        return format_html('<a href="{}/refs/product/?id={}" target="_blank">{}</a>', settings.ADMIN_PATH_PREFIX, obj.product.id, obj.product.name)
+    get_product.short_description = _('product')
 
     def get_count(self, obj):
         color = 'green' if obj.doc.type.income==True else 'red'
@@ -114,17 +138,25 @@ class RecordAdmin(CustomModelAdmin):
     get_price.short_description = _('price')
     get_price.admin_order_field = 'price'
 
+    def get_sum_cost(self, obj):
+        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', (obj.cost*obj.count).quantize(Decimal('0.00')), obj.currency.name if obj.currency else '')
+    get_sum_cost.short_description = _('sum price')
+
+    def get_sum_price(self, obj):
+        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', (obj.price*obj.count).quantize(Decimal('0.00')), obj.currency.name if obj.currency else '')
+    get_sum_price.short_description = _('sum price')
+
 admin.site.register(Record, RecordAdmin)
 
 
 class RegisterAdmin(CustomModelAdmin):
-    list_display = ('id', 'rec', 'get_product', 'get_count', 'get_cost', 'get_price', 'get_doc')
+    list_display = ('id', 'rec', 'get_product', 'get_cost', 'get_price', 'get_count', 'get_sum_cost', 'get_sum_price', 'get_doc')
     list_display_links = ('id',)
     search_fields = ('id', 'rec__doc__owner__name', 'rec__doc__contractor__name', 'rec__doc__type__name')
     list_filter = ('rec__product', 'rec__doc', 'rec__doc__type')
 
     def get_product(self, obj):
-        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{}</font>', obj.rec.product)
+        return format_html('<a href="{}/refs/product/?id={}" target="_blank">{}</a>', settings.ADMIN_PATH_PREFIX, obj.rec.product.id, obj.rec.product.name)
     get_product.short_description = _('product')
 
     def get_count(self, obj):
@@ -143,5 +175,13 @@ class RegisterAdmin(CustomModelAdmin):
     def get_doc(self, obj):
         return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{}</font>', obj.rec.doc)
     get_doc.short_description = _('document')
+
+    def get_sum_cost(self, obj):
+        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', (obj.rec.cost*obj.rec.count).quantize(Decimal('0.00')), obj.rec.currency.name if obj.rec.currency else '')
+    get_sum_cost.short_description = _('sum cost')
+
+    def get_sum_price(self, obj):
+        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', (obj.rec.price*obj.rec.count).quantize(Decimal('0.00')), obj.rec.currency.name if obj.rec.currency else '')
+    get_sum_price.short_description = _('sum price')
 
 admin.site.register(Register, RegisterAdmin)

@@ -125,11 +125,14 @@ msgstr "Город"
 msgid "Cities"
 msgstr "Города"
 
+msgid "unit"
+msgstr "единица"
+
 msgid "Unit"
-msgstr "Еденица"
+msgstr "Единица"
 
 msgid "Units"
-msgstr "Еденицы"
+msgstr "Единицы"
 
 msgid "Currency"
 msgstr "Валюта"
@@ -493,3 +496,21 @@ msgstr "Пользователь"
 
 msgid "Users"
 msgstr "Пользователи"
+
+msgid "load from XLS file"
+msgstr "загрузить из файла XLS"
+
+msgid "export to XLS file"
+msgstr "экспорт в файл XLS"
+
+msgid "unload price to XLS file"
+msgstr "выгрузить прайс в файл XLS"
+
+msgid "sum"
+msgstr "сумма"
+
+msgid "sum cost"
+msgstr "сумма закупки"
+
+msgid "sum price"
+msgstr "сумма продажи"

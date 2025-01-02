@@ -487,41 +487,130 @@ admin.site.register(ProductGroup, ProductGroupAdmin)
 
 
 class ProductAdmin(CustomModelAdmin):
-    __last_register__ = None
-    list_display = ('id', 'article', 'name', 'get_barcodes', 'get_qrcodes', 'get_cost', 'get_price', 'count', 'get_tax', 'get_model', 'get_group', 'extinfo')
+    __objs__ = {}
+    list_display = ('id', 'article', 'name', 'get_barcodes', 'get_qrcodes', 'get_cost', 'get_price', 'count', 'get_sum', 'get_tax', 'get_model', 'get_group', 'extinfo')
     list_display_links = ('id', 'article', 'name')
     search_fields = ('name', 'article', 'extinfo', 'barcodes__id', 'qrcodes__id', 'group__name')
     list_select_related = ('tax', 'model', 'group')
     list_filter = (ProductGroupFilter, ProductManufacturerFilter, ProductModelFilter, TaxFilter)
     autocomplete_fields = ('tax', 'model', 'group', 'barcodes', 'qrcodes')
-    actions = ('from_xls', 'to_xls', 'barcode_generator')
+    actions = ('from_xls', 'to_xls', 'price_to_xls')
 
     #class Media:
         #js = ['admin/js/autocomplete.js', 'admin/js/vendor/select2/select2.full.js']
 
-    def get_cost(self, obj):
-        if not self.__last_register__:
+    def worksheet_cell_write(self, worksheet, row, col, value, type_value = None, fmt = None):
+        func_write = worksheet.write
+        if type_value == 'as_number':
+            func_write = worksheet.write_number
+        elif type_value == 'as_datetime':
+            func_write = worksheet.write_datetime
+        try:
+            if fmt:
+                func_write(row, col, value, fmt)
+            else:
+                func_write(row, col, value)
+        except Exception as e:
             try:
-                self.__last_register__ = get_model('core.Register').objects.filter(rec__product_id=obj.id).order_by('-rec__doc__registered_at').first()
+                if fmt:
+                    func_write(row, col, repr(value), fmt)
+                else:
+                    func_write(row, col, repr(value))
+            except Exception as e:
+                self.loge(e, row, col)
+        return col + 1
+
+    def queryset_to_xls(self, request, queryset, fields={}, exclude_fields=['id']):
+        import xlsxwriter
+        output = None
+        if queryset.count():
+            field_names = list(fields.keys())
+            if not field_names:
+                for field in queryset.model._meta.get_fields():
+                    if field.name and field.name not in exclude_fields:
+                        field_names.append(field.name)
+            output = BytesIO()
+            workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+            worksheet = workbook.add_worksheet()
+            cell_format_bold = workbook.add_format({'align':'center', 'valign':'vcenter', 'bold':True})
+            cell_format_left = workbook.add_format({'align':'left', 'valign':'vcenter'})
+            col = 0
+            for field_name in field_names:
+                field_title = field_name
+                if field_name in fields:
+                    width = fields[field_name].get('width', None)
+                    if width is not None:
+                        worksheet.set_column(col, col, width)
+                    field_title = fields[field_name].get('title', field_title)
+                col = self.worksheet_cell_write(worksheet, 0, col, _(field_title), fmt=cell_format_bold)
+            row = 1
+            for item in queryset:
+                worksheet.set_row(row, None, cell_format_left)
+                col = 0
+                for field_name in field_names:
+                    if not hasattr(item, field_name):
+                        col += 1
+                        continue
+                    else:
+                        if not field_name:
+                            col += 1
+                            continue
+                    try:
+                        value = getattr(item, field_name)
+                    except AttributeError as e:
+                        col += 1
+                        self.loge(e)
+                    except Exception as e:
+                        col += 1
+                        self.loge(e)
+                    else:
+                        if not value:
+                            col += 1
+                        else:
+                            format_value = None
+                            tvalue = None
+                            if isinstance(value, datetime):
+                                value = f'{value.strftime("%Y.%m.%d %H:%M:%S")}'
+                            elif isinstance(value, (int, float)):
+                                tvalue = 'as_number'
+                            elif not isinstance(value, str):
+                                value = f'{value}'
+                            col = self.worksheet_cell_write(worksheet, row, col, value, tvalue, format_value)
+                row += 1
+            workbook.close()
+            output.seek(0)
+        return output
+
+    def get_last_reg(self, obj):
+        if obj.id in self.__objs__ and 'lreg' in self.__objs__[obj.id]:
+            return self.__objs__[obj.id]['lreg']
+        else:
+            if obj.id not in self.__objs__:
+                self.__objs__[obj.id] = {}
+            try:
+                self.__objs__[obj.id]['lreg'] = get_model('core.Register').objects.filter(rec__product_id=obj.id).order_by('-rec__doc__registered_at').first()
             except Exception as e:
                 self.loge(e)
+            else:
+                return self.__objs__[obj.id]['lreg']
+
+    def get_price_value(self, obj):
+        last_reg = self.get_last_reg(obj)
+        if last_reg:
+            return last_reg.rec.price
+        return obj.price
+
+    def get_cost(self, obj):
+        last_reg = self.get_last_reg(obj)
         value = obj.cost
-        if self.__last_register__:
-            value = self.__last_register__.rec.cost
+        if last_reg:
+            value = last_reg.rec.cost
         return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', value, obj.currency.name if obj.currency else '')
     get_cost.short_description = _('cost')
     get_cost.admin_order_field = 'cost'
 
     def get_price(self, obj):
-        if not self.__last_register__:
-            try:
-                self.__last_register__ = get_model('core.Register').objects.filter(rec__product_id=obj.id).order_by('-rec__doc__registered_at').first()
-            except Exception as e:
-                self.loge(e)
-        value = obj.price
-        if self.__last_register__:
-            value = self.__last_register__.rec.price
-        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', value.quantize(Decimal('0.00')), obj.currency.name if obj.currency else '')
+        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', self.get_price_value(obj).quantize(Decimal('0.00')), obj.currency.name if obj.currency else '')
     get_price.short_description = _('price')
     get_price.admin_order_field = 'price'
 
@@ -549,13 +638,36 @@ class ProductAdmin(CustomModelAdmin):
             return format_html('<details><summary>{}</summary>{}</details>', idxs[0][1], content)
     get_qrcodes.short_description = _('Qr Codes')
 
+    def get_count_from_reg(self, obj):
+        if obj.id in self.__objs__ and 'count' in self.__objs__[obj.id]:
+            return self.__objs__[obj.id]['count']
+        else:
+            if obj.id not in self.__objs__:
+                self.__objs__[obj.id] = {}
+            SumIncome=Sum('rec__count', filter=Q(rec__doc__type__income=True), default=0)
+            SumExpense=Sum('rec__count', filter=Q(rec__doc__type__income=False), default=0)
+            try:
+                self.__objs__[obj.id]['count'] = get_model('core.Register').objects.filter(rec__product_id=obj.id).aggregate(count=SumIncome-SumExpense)['count']
+            except Exception as e:
+                self.loge(e)
+            else:
+                return self.__objs__[obj.id]['count']
+        return 0
+
     def count(self, obj):
-        SumIncome=Sum('rec__count', filter=Q(rec__doc__type__income=True), default=0)
-        SumExpense=Sum('rec__count', filter=Q(rec__doc__type__income=False), default=0)
-        result = get_model('core.Register').objects.filter(rec__product_id=obj.id).aggregate(count=SumIncome-SumExpense)['count']
+        result = self.get_count_from_reg(obj)
         color = 'green' if result > 0 else 'red'
         return format_html('<p><a href="{}/core/register/?rec__product={}" target="_blank" style="color:{}">{}</a></p>', settings.ADMIN_PATH_PREFIX, obj.id, color, result)
     count.short_description = _('Count')
+
+    def get_sum(self, obj):
+        count = self.get_count_from_reg(obj)
+        price = self.get_price_value(obj)
+        if count > 0 and price > 0:
+            #return f'{count * price:.2f}'
+            return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', (price*count).quantize(Decimal('0.00')), obj.currency.name if obj.currency else '')
+        return '0'
+    get_sum.short_description = _('sum')
 
     def get_tax(self, obj):
         o = obj.tax
@@ -585,7 +697,6 @@ class ProductAdmin(CustomModelAdmin):
     get_group.admin_order_field = 'group'
 
     def from_xls(self, request, queryset, **kwargs):
-        import xlsxwriter
         from transliterate import slugify
         from openpyxl import load_workbook
         form = None
@@ -701,6 +812,26 @@ class ProductAdmin(CustomModelAdmin):
         context['available_apps'] = (m.app_label,)
         context['app_label'] = m.app_label
         return render(request, 'admin_select_file_form.html', context)
-    from_xls.short_description = f'⚔{_("load from XLS file")}🔙'
+    from_xls.short_description = f'⚔{_("load from XLS file")}'
+
+    def to_xls(self, request, queryset):
+        output = self.queryset_to_xls(request, queryset.annotate(unit_name=F('unit__name'), barcode_first=F('barcodes__id'), qrcode_first=F('qrcodes__id')), {'group':{'width':20}, 'name':{'width':20}, 'article':{'width':20}, 'barcode_first':{'width':20, 'title':'barcode'}, 'unit_name':{'title':'unit'}, 'cost':{}, 'price':{}, 'qrcode_first':{'width':20, 'title':'qrcode'}})
+        if output:
+            fn = '{}.xlsx'.format(django_timezone.now().strftime('%Y%m%d%H%M%S'))
+            self.message_user(request, f'🆗 {_("Finished")} ✏️({fn})', messages.SUCCESS)
+            return FileResponse(output, as_attachment=True, filename=fn)
+        self.message_user(request, _('please select items'), messages.ERROR)
+    to_xls.short_description = f'⚔{_("export to XLS file")}↘️'
+
+    def price_to_xls(self, request, queryset):
+        last_register = get_model('core.Register').objects.filter(rec__product_id=OuterRef('pk')).order_by('-rec__doc__registered_at')[:1]
+        queryset = queryset.annotate(last_price=Subquery(last_register.values('rec__price')))
+        output = self.queryset_to_xls(request, queryset, {'article':{'width':30}, 'name':{'width':50}, 'last_price':{'width':20, 'title':'price'}})
+        if output:
+            fn = '{}.xlsx'.format(django_timezone.now().strftime('%Y%m%d%H%M%S'))
+            self.message_user(request, f'🆗 {_("Finished")} ✏️({fn})', messages.SUCCESS)
+            return FileResponse(output, as_attachment=True, filename=fn)
+        self.message_user(request, _('please select items'), messages.ERROR)
+    price_to_xls.short_description = f'⚔{_("unload price to XLS file")}↘️'
 
 admin.site.register(Product, ProductAdmin)
