@@ -466,9 +466,46 @@ admin.site.register(SalePoint, SalePointAdmin)
 
 
 class BarCodeAdmin(CustomModelAdmin):
-    list_display = ['id']
+    list_display = ('id', 'get_products')
     list_display_links = ['id']
     search_fields = ['id']
+    actions = ('fix_code',)
+
+    def get_products(self, obj):
+        try:
+            idxs = Product.objects.filter(barcodes__id=obj.id).annotate(admin_path_prefix=Value(settings.ADMIN_PATH_PREFIX, CharField())).values_list('admin_path_prefix', 'id', 'name')
+        except Exception as e:
+            self.loge(e)
+            return ''
+        else:
+            if not idxs:
+                return ''
+            content = format_html_join('\n', '<p><font color="green" face="Verdana, Geneva, sans-serif"><a href="{0}/refs/product/?id={1}" target="_blank">{2}</a></font></p>', idxs)
+            return format_html('<details><summary>{}</summary>{}</details>', idxs[0][2], content)
+    get_products.short_description = _('Products')
+
+    def fix_code(self, request, queryset):
+        from barcode import EAN13
+        replaced = 0
+        for bcode in queryset:
+            ean13 = EAN13(bcode.id)
+            if bcode.id != ean13.ean:
+                products = []
+                for p in Product.objects.filter(barcodes__id=bcode.id):
+                    products.append(p)
+                    p.barcodes.remove(bcode)
+                bcode.id = ean13.ean
+                try:
+                    bcode.save()
+                except Exception as e:
+                    self.loge(e)
+                else:
+                    replaced += 1
+                    for p in products:
+                        p.barcodes.add(bcode)
+        self.message_user(request, f"{_(f'fixed')} {replaced}", messages.SUCCESS)
+    fix_code.short_description = f'✨{_("fix values")}🖋'
+
 admin.site.register(BarCode, BarCodeAdmin)
 
 
@@ -494,7 +531,7 @@ class ProductAdmin(CustomModelAdmin):
     list_select_related = ('tax', 'model', 'group')
     list_filter = (ProductGroupFilter, ProductManufacturerFilter, ProductModelFilter, TaxFilter)
     autocomplete_fields = ('tax', 'model', 'group', 'barcodes', 'qrcodes')
-    actions = ('from_xls', 'to_xls', 'price_to_xls')
+    actions = ('from_xls', 'to_xls', 'price_to_xls', 'barcode_to_svg')
 
     #class Media:
         #js = ['admin/js/autocomplete.js', 'admin/js/vendor/select2/select2.full.js']
@@ -821,7 +858,7 @@ class ProductAdmin(CustomModelAdmin):
             self.message_user(request, f'🆗 {_("Finished")} ✏️({fn})', messages.SUCCESS)
             return FileResponse(output, as_attachment=True, filename=fn)
         self.message_user(request, _('please select items'), messages.ERROR)
-    to_xls.short_description = f'⚔{_("export to XLS file")}↘️'
+    to_xls.short_description = f'⚔{_("export to XLS file")}↘'
 
     def price_to_xls(self, request, queryset):
         last_register = get_model('core.Register').objects.filter(rec__product_id=OuterRef('pk')).order_by('-rec__doc__registered_at')[:1]
@@ -832,6 +869,21 @@ class ProductAdmin(CustomModelAdmin):
             self.message_user(request, f'🆗 {_("Finished")} ✏️({fn})', messages.SUCCESS)
             return FileResponse(output, as_attachment=True, filename=fn)
         self.message_user(request, _('please select items'), messages.ERROR)
-    price_to_xls.short_description = f'⚔{_("unload price to XLS file")}↘️'
+    price_to_xls.short_description = f'⚔{_("unload price to XLS file")}↘'
+
+    def barcode_to_svg(self, request, queryset):
+        from barcode import EAN13
+        from barcode.writer import SVGWriter
+        svgs = '<style>@media print{body{visibility:hidden;} #section-to-print {visibility:visible;position:absolute;left:0;top:0;}}</style><div id="section-to-print">'
+        for it in queryset:
+            bcode_value = it.barcodes.first()
+            if bcode_value:
+                ean = EAN13(bcode_value.id, writer=SVGWriter())
+                svg = ean.render(settings.ADMIN_EAN13_RENDER_OPTIONS, it.name).decode('UTF-8').replace('\n', '')
+                self.logi(bcode_value.id, ean.to_ascii())
+                svgs += svg + '<br>'
+        svgs = svgs[:-4] + '</div>'
+        self.message_user(request, mark_safe(svgs), messages.SUCCESS)
+    barcode_to_svg.short_description = f'🖶{_("print barcode as SVG")}🖼'
 
 admin.site.register(Product, ProductAdmin)

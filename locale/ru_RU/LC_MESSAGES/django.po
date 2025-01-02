@@ -215,6 +215,12 @@ msgstr "Штрихкод"
 msgid "Bar Codes"
 msgstr "Штрихкоды"
 
+msgid "fix values"
+msgstr "исправить значения"
+
+msgid "fixed"
+msgstr "исправлено"
+
 msgid "Qr Code"
 msgstr "Qr-код"
 
@@ -514,3 +520,6 @@ msgstr "сумма закупки"
 
 msgid "sum price"
 msgstr "сумма продажи"
+
+msgid "print barcode as SVG"
+msgstr "печатать штрихкод как SVG"
