@@ -69,6 +69,7 @@ class DocAdmin(CustomModelAdmin):
     list_display = ('id', 'created_at', 'registered_at', 'get_records', 'get_sum_cost', 'get_sum_price', 'sum_final', 'owner', 'contractor', 'type', 'tax', 'author', 'extinfo')
     list_display_links = ('id', 'created_at', 'registered_at')
     search_fields = ('id', 'created_at', 'registered_at', 'owner__name', 'contractor__name', 'type__name', 'tax__name', 'sale_point__name', 'author__username', 'extinfo')
+    actions = ('recalculate_final_sum',)
 
     def save_model(self, request, instance, form, change):
         current_user = request.user
@@ -119,6 +120,26 @@ class DocAdmin(CustomModelAdmin):
                 full_sum = 0
         return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{}</font>', full_sum)
     get_sum_price.short_description = _('sum price')
+
+    def recalculate_final_sum(self, request, queryset):
+        updated_count = 0
+        docs = []
+        for it in queryset:
+            value = None
+            if it.type.income:
+                value = Record.objects.filter(doc=it).aggregate(sum_final=Sum(F('count') * F('cost')))['sum_final']
+            else:
+                value = Record.objects.filter(doc=it).aggregate(sum_final=Sum(F('count') * F('price')))['sum_final']
+            if value is not None and it.sum_final != value:
+                it.sum_final = value
+                docs.append(it)
+        if docs:
+            try:
+                updated_count = Doc.objects.bulk_update(docs, ['sum_final'])
+            except Exception as e:
+                self.loge(e)
+        self.message_user(request, f'{_("updated")} {updated_count}', messages.SUCCESS)
+    recalculate_final_sum.short_description = f'🖩{_("recalculate final sum")}'
 
 admin.site.register(Doc, DocAdmin)
 
