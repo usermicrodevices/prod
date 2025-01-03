@@ -66,7 +66,7 @@ class CustomModelAdmin(admin.ModelAdmin):
 
 
 class DocAdmin(CustomModelAdmin):
-    list_display = ('id', 'created_at', 'registered_at', 'get_records', 'get_sum_cost', 'get_sum_price', 'owner', 'contractor', 'type', 'tax', 'author', 'extinfo')
+    list_display = ('id', 'created_at', 'registered_at', 'get_records', 'get_sum_cost', 'get_sum_price', 'sum_final', 'owner', 'contractor', 'type', 'tax', 'author', 'extinfo')
     list_display_links = ('id', 'created_at', 'registered_at')
     search_fields = ('id', 'created_at', 'registered_at', 'owner__name', 'contractor__name', 'type__name', 'tax__name', 'sale_point__name', 'author__username', 'extinfo')
 
@@ -101,6 +101,8 @@ class DocAdmin(CustomModelAdmin):
         else:
             if full_sum:
                 full_sum = full_sum.quantize(Decimal('0.00'))
+            else:
+                full_sum = 0
         return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{}</font>', full_sum)
     get_sum_cost.short_description = _('sum cost')
 
@@ -113,6 +115,8 @@ class DocAdmin(CustomModelAdmin):
         else:
             if full_sum:
                 full_sum = full_sum.quantize(Decimal('0.00'))
+            else:
+                full_sum = 0
         return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{}</font>', full_sum)
     get_sum_price.short_description = _('sum price')
 

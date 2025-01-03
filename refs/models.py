@@ -259,8 +259,8 @@ class DocType(models.Model):
         return self.name
 
     class Meta:
-        verbose_name = f'🗂️{_("Doc Type")}'
-        verbose_name_plural = f'🗂️{_("Doc Types")}'
+        verbose_name = f'🏷️{_("Doc Type")}'
+        verbose_name_plural = f'🏷️{_("Doc Types")}'
         ordering = ['name']
 
 
@@ -273,8 +273,8 @@ class ProductGroup(models.Model):
         return self.name
 
     class Meta:
-        verbose_name = f'🗂️{_("Product Group")}'
-        verbose_name_plural = f'🗂️{_("Product Groups")}'
+        verbose_name = f'📚{_("Product Group")}'
+        verbose_name_plural = f'📚{_("Product Groups")}'
         ordering = ['name']
 
 
@@ -294,8 +294,8 @@ class Product(models.Model):
 
     class Meta:
         unique_together = ('article', 'name')
-        verbose_name = f'✽{_("Product")}'
-        verbose_name_plural = f'✽{_("Products")}'
+        verbose_name = f'📦{_("Product")}'
+        verbose_name_plural = f'📦{_("Products")}'
         ordering = ['name']
 
     def __str__(self):
