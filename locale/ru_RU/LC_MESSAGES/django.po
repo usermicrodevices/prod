@@ -521,5 +521,11 @@ msgstr "сумма закупки"
 msgid "sum price"
 msgstr "сумма продажи"
 
+msgid "final sum"
+msgstr "финальная сумма"
+
+msgid "final sum of document"
+msgstr "финальная сумма документа"
+
 msgid "print barcode as SVG"
 msgstr "печатать штрихкод как SVG"

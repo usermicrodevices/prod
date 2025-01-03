@@ -5,17 +5,23 @@ from datetime import datetime, timedelta, timezone
 
 from django.conf import settings
 from django.db import models, transaction
-from django.db.models import F, Q, Max, Subquery, Value, IntegerField, JSONField
+from django.db.models import F, Q, Max, Sum, Subquery, Value, IntegerField, JSONField
 from django.db.models.signals import pre_save, post_save, post_init, post_delete
 from django.dispatch import receiver
 from django.utils import timezone as django_timezone
 from django.utils.translation import gettext as _
 from django.core.cache import caches
 from django.db.utils import IntegrityError
+from django.apps import apps as django_apps
 try:
     from zoneinfo import available_timezones, ZoneInfo
 except:
     from backports.zoneinfo import available_timezones, ZoneInfo
+
+
+def get_model(app_model):
+    app_name, model_name = app_model.split('.')
+    return django_apps.get_app_config(app_name).get_model(model_name)
 
 
 class CustomAbstractModel(models.Model):
@@ -84,15 +90,30 @@ class Doc(models.Model):
     tax = models.ForeignKey('refs.Tax', default=1, null=False, blank=False, on_delete=models.CASCADE, verbose_name=_('tax'), help_text=_('tax of document'))
     sale_point = models.ForeignKey('refs.SalePoint', default=None, null=True, blank=True, on_delete=models.SET_NULL, verbose_name=_('sale point'), help_text=_('sale point of document'))
     author = models.ForeignKey('users.User', default=1, null=False, blank=False, editable=False, on_delete=models.CASCADE, verbose_name=_('author'), help_text=_('author of document'))
+    sum_final = models.DecimalField(max_digits=15, decimal_places=3, default=0, null=False, blank=False, verbose_name=_('final sum'), help_text=_('final sum of document'))
     extinfo = JSONField(default=dict, blank=True)
 
     class Meta:
-        verbose_name = f'📄{_("Doc")}'
-        verbose_name_plural = f'📄{_("Docs")}'
+        verbose_name = f'🗂{_("Doc")}'
+        verbose_name_plural = f'🗂{_("Docs")}'
         ordering = ['-registered_at']
 
     def __str__(self):
         return f'[{self.id}]{self.type.name}'
+
+@receiver(pre_save, sender=Doc)
+def on_doc_pre_save(sender, **kwargs):
+    instance: Doc = kwargs['instance']
+    if kwargs.get('created', False):
+        recs = get_model('core.Record').objects.filter(doc=instance)
+        if not instance.sum_final and recs.count():
+            value = None
+            if instance.type.income:
+                value = recs.aggregate(sum_final=Sum(F('count') * F('cost')))['sum_final']
+            else:
+                value = recs.aggregate(sum_final=Sum(F('count') * F('price')))['sum_final']
+            if value:
+                instance.sum_final = value
 
 
 class Record(models.Model):
@@ -108,6 +129,24 @@ class Record(models.Model):
         verbose_name = f'®{_("Record")}'
         verbose_name_plural = f'®{_("Records")}'
         ordering = ['-id']
+
+@receiver(post_save, sender=Record)
+def on_doc_post_save(sender, **kwargs):
+    instance: Record = kwargs['instance']
+    recs = Record.objects.filter(doc=instance.doc)
+    if not instance.doc.sum_final:
+        value = None
+        if instance.doc.type.income:
+            value = recs.aggregate(sum_final=Sum(F('count') * F('cost')))['sum_final']
+        else:
+            value = recs.aggregate(sum_final=Sum(F('count') * F('price')))['sum_final']
+        if value:
+            Doc.objects.filter(id=instance.doc_id).update(sum_final=value)
+    elif kwargs.get('created', False):
+        if instance.doc.type.income and instance.cost and instance.count:
+            Doc.objects.filter(id=instance.doc_id).update(sum_final = instance.doc.sum_final + instance.cost * instance.count)
+        elif not instance.doc.type.income and instance.price and instance.count:
+            Doc.objects.filter(id=instance.doc_id).update(sum_final = instance.doc.sum_final + instance.price * instance.count)
 
 
 class Register(models.Model):
