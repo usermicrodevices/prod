@@ -153,4 +153,4 @@ LOGGING = {
 
 FAVICON_BASE64 = '''data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath d='M224%20387.814V512L32 320l192-192v126.912C447.375 260.152 437.794 103.016 380.93 0 521.287 151.707 491.48 394.785 224 387.814z'/%3E%3C/svg%3E'''
 
-ADMIN_EAN13_RENDER_OPTIONS = {'module_height':5.0, 'quiet_zone':1.0, 'font_size':7, 'text_distance':3.0}
+ADMIN_EAN13_RENDER_OPTIONS = {'module_width':0.3, 'module_height':6.0, 'quiet_zone':0.5, 'font_size':8, 'text_distance':2.5, 'show_name':False, 'name_at_top':True, 'name_at_top_x':'center', 'name_at_top_h':8, 'text_wrapped_symbols':15}

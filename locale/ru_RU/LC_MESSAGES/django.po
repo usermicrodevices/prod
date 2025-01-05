@@ -527,5 +527,11 @@ msgstr "финальная сумма"
 msgid "final sum of document"
 msgstr "финальная сумма документа"
 
+msgid "recalculate final sum"
+msgstr "пересчитать финальную сумму"
+
 msgid "print barcode as SVG"
 msgstr "печатать штрихкод как SVG"
+
+msgid "updated"
+msgstr "обновлено"

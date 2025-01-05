@@ -1,4 +1,4 @@
-import logging, sys, time
+import logging, re, sys, time
 from decimal import Decimal
 from io import BytesIO, StringIO
 from datetime import datetime, timedelta
@@ -872,17 +872,45 @@ class ProductAdmin(CustomModelAdmin):
     price_to_xls.short_description = f'⚔{_("unload price to XLS file")}↘'
 
     def barcode_to_svg(self, request, queryset):
+        from textwrap import wrap
         from barcode import EAN13
         from barcode.writer import SVGWriter
-        svgs = '<style>@media print{body{visibility:hidden;} #section-to-print {visibility:visible;position:absolute;left:0;top:0;}}</style><div id="section-to-print">'
+        svgs = ''
+        svg_width = '30mm'
+        svg_height = '20mm'
+        font_size = settings.ADMIN_EAN13_RENDER_OPTIONS.get('font_size', 8)
+        text_wrapped_symbols = settings.ADMIN_EAN13_RENDER_OPTIONS.get('text_wrapped_symbols', 15)
+        show_name = settings.ADMIN_EAN13_RENDER_OPTIONS.get('show_name', False)
+        name_at_top = settings.ADMIN_EAN13_RENDER_OPTIONS.get('name_at_top', False)
+        name_at_top_h = settings.ADMIN_EAN13_RENDER_OPTIONS.get('name_at_top_h', font_size)
+        name_at_top_x = settings.ADMIN_EAN13_RENDER_OPTIONS.get('name_at_top_x', 'center')
         for it in queryset:
             bcode_value = it.barcodes.first()
             if bcode_value:
-                ean = EAN13(bcode_value.id, writer=SVGWriter())
-                svg = ean.render(settings.ADMIN_EAN13_RENDER_OPTIONS, it.name).decode('UTF-8').replace('\n', '')
-                self.logi(bcode_value.id, ean.to_ascii())
-                svgs += svg + '<br>'
-        svgs = svgs[:-4] + '</div>'
+                name_wrapped = '\n'.join(wrap(it.name, text_wrapped_symbols))
+                svgwriter = SVGWriter()
+                ean = EAN13(bcode_value.id, writer=svgwriter)
+                if show_name:
+                    svg = ean.render(settings.ADMIN_EAN13_RENDER_OPTIONS, name_wrapped).decode('UTF-8').replace('\n', '')
+                else:
+                    svg = ean.render(settings.ADMIN_EAN13_RENDER_OPTIONS).decode('UTF-8').replace('\n', '')
+                if settings.DEBUG:
+                    self.logi(bcode_value.id, ean.to_ascii())
+                if name_at_top and not show_name:
+                    svg_width = svgwriter._root.getAttribute('width')
+                    svg_height = f'{float(svgwriter._root.getAttribute('height').replace('mm', '')) + name_at_top_h}mm'
+                    if name_at_top_x == 'center':
+                        texts = svgwriter._document.getElementsByTagName('text')
+                        if texts:
+                            name_at_top_x = texts[0].getAttribute('x')
+                        else:
+                            name_at_top_x = '0mm'
+                    name_wrapped = f'</tspan><tspan x="{name_at_top_x}" dy="{name_at_top_h}pt">'.join(wrap(it.name, text_wrapped_symbols)).join([f'<tspan x="{name_at_top_x}" dy="{name_at_top_h}pt">','</tspan>'])
+                    svg_top = f'<svg id="top" xmlns="http://www.w3.org/2000/svg" width="{svg_width}" height="{svg_height}"><g id="top-g"><text id="top-text" x="{name_at_top_x}mm" style="font-size:{font_size}pt;text-anchor:middle;">{name_wrapped}</text></g>'
+                    svgs += f'<p style="margin:0;padding:0;line-height:100%;">{svg_top}{svg.replace('<svg', f'<svg y="{name_at_top_h}mm"')}</svg></p>'
+                else:
+                    svgs += f'<p style="margin:0;padding:0;line-height:100%;">{svg}</p>'
+        svgs = '<style>@media print{body{visibility:hidden;} #section-to-print{visibility:visible;position:absolute;left:0;top:0;}} @page{size: ' + f'{svg_width} {svg_height}' + '; margin:0;} div.pad{page-break-after:avoid;} header,footer,aside,nav,form,iframe,button,.ad,#content,#toggle-nav-sidebar{display:none;}</style><div id="section-to-print" style="text-align:center;background-color:white;'+f'width:{svg_width};font-size:{font_size}pt;">' + re.sub('(<!--.*?-->)', '', svgs, flags=re.DOTALL) + '</div>'
         self.message_user(request, mark_safe(svgs), messages.SUCCESS)
     barcode_to_svg.short_description = f'🖶{_("print barcode as SVG")}🖼'
 
