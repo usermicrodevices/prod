@@ -535,3 +535,6 @@ msgstr "печатать штрихкод как SVG"
 
 msgid "updated"
 msgstr "обновлено"
+
+msgid "Print"
+msgstr "Печать"

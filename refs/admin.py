@@ -875,6 +875,10 @@ class ProductAdmin(CustomModelAdmin):
         from textwrap import wrap
         from barcode import EAN13
         from barcode.writer import SVGWriter
+        def eval_dim(val, n, m='-'):
+            v = re.findall('\d+\.\d+', val)[0]
+            suffix = val.replace(v, '')
+            return f'{eval(f'{v}{m}{n}')}{suffix}'
         svgs = ''
         svg_width = '30mm'
         svg_height = '20mm'
@@ -884,6 +888,11 @@ class ProductAdmin(CustomModelAdmin):
         name_at_top = settings.ADMIN_EAN13_RENDER_OPTIONS.get('name_at_top', False)
         name_at_top_h = settings.ADMIN_EAN13_RENDER_OPTIONS.get('name_at_top_h', font_size)
         name_at_top_x = settings.ADMIN_EAN13_RENDER_OPTIONS.get('name_at_top_x', 'center')
+        css_media_orientation = settings.ADMIN_EAN13_RENDER_OPTIONS.get('css_media_orientation', '')
+        css_media_page_size_ext = settings.ADMIN_EAN13_RENDER_OPTIONS.get('css_media_page_size_ext', 'landscape;page-orientation:rotate-right')
+        css_media_ext = settings.ADMIN_EAN13_RENDER_OPTIONS.get('css_media_ext', '')
+        print_button = settings.ADMIN_EAN13_RENDER_OPTIONS.get('print_button', '')
+        print_script = settings.ADMIN_EAN13_RENDER_OPTIONS.get('print_script', '')
         for it in queryset:
             bcode_value = it.barcodes.first()
             if bcode_value:
@@ -906,11 +915,11 @@ class ProductAdmin(CustomModelAdmin):
                         else:
                             name_at_top_x = '0mm'
                     name_wrapped = f'</tspan><tspan x="{name_at_top_x}" dy="{name_at_top_h}pt">'.join(wrap(it.name, text_wrapped_symbols)).join([f'<tspan x="{name_at_top_x}" dy="{name_at_top_h}pt">','</tspan>'])
-                    svg_top = f'<svg id="top" xmlns="http://www.w3.org/2000/svg" width="{svg_width}" height="{svg_height}"><g id="top-g"><text id="top-text" x="{name_at_top_x}mm" style="font-size:{font_size}pt;text-anchor:middle;">{name_wrapped}</text></g>'
-                    svgs += f'<p style="margin:0;padding:0;line-height:100%;">{svg_top}{svg.replace('<svg', f'<svg y="{name_at_top_h}mm"')}</svg></p>'
+                    svg_top = f'<svg id="top" xmlns="http://www.w3.org/2000/svg" width="{eval_dim(svg_width,.5)}" height="{eval_dim(svg_height,1.911)}"><g id="top-g"><text id="top-text" x="{name_at_top_x}mm" style="font-size:{font_size}pt;text-anchor:middle;">{name_wrapped}</text></g>'
+                    svgs += f'<p class="page-pad">{svg_top}{svg.replace('<svg', f'<svg y="{name_at_top_h}mm"')}</svg></p>'
                 else:
-                    svgs += f'<p style="margin:0;padding:0;line-height:100%;">{svg}</p>'
-        svgs = '<style>@media print{body{visibility:hidden;} #section-to-print{visibility:visible;position:absolute;left:0;top:0;}} @page{size: ' + f'{svg_width} {svg_height}' + '; margin:0;} div.pad{page-break-after:avoid;} header,footer,aside,nav,form,iframe,button,.ad,#content,#toggle-nav-sidebar{display:none;}</style><div id="section-to-print" style="text-align:center;background-color:white;'+f'width:{svg_width};font-size:{font_size}pt;">' + re.sub('(<!--.*?-->)', '', svgs, flags=re.DOTALL) + '</div>'
+                    svgs += f'<p class="page-pad">{svg}</p>'
+        svgs = f'<div id="section-to-print"><style>@media {css_media_orientation} print{{html body{{visibility:hidden;height:auto;margin:0;padding:0;}} .content{{position:absolute;top:0;}} .messagelist{{margin:0;padding:0;}} #section-to-print{{text-align:center;background-color:white;width:0;display:flex;flex-direction:column;visibility:visible;position:absolute;left:0;top:0;}}}} @page{{size: {svg_width} {svg_height} {css_media_page_size_ext};margin:0;}} .page-pad{{page-break-after:always;margin:0;padding:0;}} .page-pad:last-of-type{{page-break-after:avoid!important;}}{css_media_ext}</style>{print_button}{print_script}' + re.sub('(<!--.*?-->)', '', svgs, flags=re.DOTALL) + '</div>'
         self.message_user(request, mark_safe(svgs), messages.SUCCESS)
     barcode_to_svg.short_description = f'🖶{_("print barcode as SVG")}🖼'
 
