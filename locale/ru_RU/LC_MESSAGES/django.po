@@ -538,3 +538,15 @@ msgstr "обновлено"
 
 msgid "Print"
 msgstr "Печать"
+
+msgid "registered"
+msgstr "зарегистрирован"
+
+msgid "auto register"
+msgstr "автоматическая регистрация"
+
+msgid "auto register when save document"
+msgstr "автоматическая регистрация когда сохраняется документа"
+
+msgid "registration for accaunting"
+msgstr "регистрация для бухгалтерского учета"

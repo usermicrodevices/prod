@@ -116,7 +116,7 @@ def on_doc_pre_save(sender, **kwargs):
                 instance.sum_final = value
 
 
-class Record(models.Model):
+class Record(CustomAbstractModel):
     count = models.DecimalField(max_digits=15, decimal_places=3, default=0, null=False, blank=False, verbose_name=_('count'), help_text=_('count of products'))
     cost = models.DecimalField(max_digits=15, decimal_places=3, default=0, null=False, blank=False, verbose_name=_('cost'), help_text=_('current cost'))
     price = models.DecimalField(max_digits=15, decimal_places=3, default=0, null=False, blank=False, verbose_name=_('price'), help_text=_('current price'))
@@ -147,6 +147,12 @@ def on_doc_post_save(sender, **kwargs):
             Doc.objects.filter(id=instance.doc_id).update(sum_final = instance.doc.sum_final + instance.cost * instance.count)
         elif not instance.doc.type.income and instance.price and instance.count:
             Doc.objects.filter(id=instance.doc_id).update(sum_final = instance.doc.sum_final + instance.price * instance.count)
+    if instance.doc.type.auto_register:
+        if not Register.objects.filter(rec=instance).exists():
+            try:
+                Register(instance).save()
+            except Exception as e:
+                instance.loge(e)
 
 
 class Register(models.Model):

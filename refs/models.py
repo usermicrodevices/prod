@@ -253,6 +253,7 @@ class DocType(models.Model):
     alias = models.CharField(max_length=191, unique=True, default='receipt', null=False, blank=False)
     name = models.CharField(max_length=191, default=_('Receipt'), verbose_name=_('name'), help_text=_('name of type document'))
     income = models.BooleanField(default=True, null=False, blank=False, verbose_name=_('income'), help_text=_('income or expense'))
+    auto_register = models.BooleanField(default=True, null=False, blank=False, verbose_name=_('auto register'), help_text=_('auto register when save document'))
     description = models.CharField(max_length=191, default=None, null=True, blank=True, verbose_name=_('description'), help_text=_('description of type document'))
 
     def __str__(self):
