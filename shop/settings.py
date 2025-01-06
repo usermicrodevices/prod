@@ -153,4 +153,33 @@ LOGGING = {
 
 FAVICON_BASE64 = '''data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath d='M224%20387.814V512L32 320l192-192v126.912C447.375 260.152 437.794 103.016 380.93 0 521.287 151.707 491.48 394.785 224 387.814z'/%3E%3C/svg%3E'''
 
-ADMIN_EAN13_RENDER_OPTIONS = {'module_width':0.3, 'module_height':6.0, 'quiet_zone':0.5, 'font_size':8, 'text_distance':2.5, 'show_name':False, 'name_at_top':True, 'name_at_top_x':'center', 'name_at_top_h':8, 'text_wrapped_symbols':15}
+ADMIN_EAN13_RENDER_OPTIONS = {
+'module_width':0.3,
+'module_height':6.0,
+'quiet_zone':0.5,
+'font_size':8,
+'text_distance':2.5,
+'show_name':False,
+'name_at_top':True,
+'name_at_top_x':'center',
+'name_at_top_h':8,
+'text_wrapped_symbols':15,
+'css_media_orientation':'(orientation:landscape)',
+'css_media_page_size_ext':'',
+'css_media_ext':'html:root{--message-success-bg:unset;} #container{height:max-content;width:max-content;min-width:unset;} ul.messagelist li{display:unset;margin:0;padding:0;background:white;background-size:unset;font-size:unset;word-break:unset;color:black;} header,footer,aside,nav,form,iframe,button,.ad,.success,#header,#content,#toggle-nav-sidebar{display:none;}',
+'print_button':'<button id="pbtn" onclick="this.hidden=true;window.print();this.hidden=false;/*window.location.reload()*/">🖶</button>',
+'print_script':'''<script>
+window.onload = function() {
+document.getElementsByTagName("head")[0].remove();
+document.body.style.margin = 0;
+document.body.style.padding = 0;
+document.body.style.width = 0;
+document.body.style.height = 0;
+const parea = document.getElementById("section-to-print");
+while(document.body.firstChild){document.body.removeChild(document.body.firstChild);}
+document.body.appendChild(parea);
+setTimeout(function(){window.print();},0);
+window.onfocus=function(){setTimeout(function(){window.location.reload();},0);}
+}
+</script>'''
+}
