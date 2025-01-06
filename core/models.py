@@ -150,7 +150,7 @@ def on_doc_post_save(sender, **kwargs):
     if instance.doc.type.auto_register:
         if not Register.objects.filter(rec=instance).exists():
             try:
-                Register(instance).save()
+                Register(rec=instance).save()
             except Exception as e:
                 instance.loge(e)
 
