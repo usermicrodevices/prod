@@ -29,6 +29,7 @@ from django.apps import apps as django_apps
 
 from .models import Doc, Record, Register
 from users.models import User
+from refs.admin import CompanyFilter, DocTypeFilter
 
 def get_model(app_model):
     app_name, model_name = app_model.split('.')
@@ -44,7 +45,29 @@ class UploadFileForm(forms.Form):
     file = forms.FileField(widget=forms.ClearableFileInput(attrs={'allow_multiple_selected': True}))
 
 
-class CustomModelAdmin(admin.ModelAdmin):
+class OwnerCompanyFilter(CompanyFilter):
+    title = _('Owner')
+    parameter_name = 'owner'
+
+    def queryset(self, request, queryset):
+        if not self.value():
+            return queryset
+        else:
+            return queryset.filter(owner=self.value())
+
+
+class ContractorCompanyFilter(CompanyFilter):
+    title = _('Contractor')
+    parameter_name = 'contractor'
+
+    def queryset(self, request, queryset):
+        if not self.value():
+            return queryset
+        else:
+            return queryset.filter(contractor=self.value())
+
+
+class CoreBaseAdmin():
 
     def logi(self, *args):
         msg = f'ℹ️{self.__class__.__name__}.{sys._getframe().f_back.f_code.co_name}'
@@ -64,90 +87,22 @@ class CustomModelAdmin(admin.ModelAdmin):
             msg += f'::{arg}'
         logging.error(msg)
 
+class CustomStackedInline(CoreBaseAdmin, admin.StackedInline):
+    pass
 
-class DocAdmin(CustomModelAdmin):
-    list_display = ('id', 'created_at', 'registered_at', 'get_records', 'get_sum_cost', 'get_sum_price', 'sum_final', 'owner', 'contractor', 'type', 'tax', 'author', 'extinfo')
-    list_display_links = ('id', 'created_at', 'registered_at')
-    search_fields = ('id', 'created_at', 'registered_at', 'owner__name', 'contractor__name', 'type__name', 'tax__name', 'sale_point__name', 'author__username', 'extinfo')
-    actions = ('recalculate_final_sum',)
+class CustomTabularInline(CoreBaseAdmin, admin.TabularInline):
+    pass
 
-    def save_model(self, request, instance, form, change):
-        current_user = request.user
-        instance = form.save(commit=False)
-        if not change or not instance.author:
-            instance.author = current_user
-        instance.save()
-        form.save_m2m()
-        return instance
-
-    def get_records(self, obj):
-        try:
-            idxs = Record.objects.filter(doc=obj).annotate(admin_path_prefix=Value(settings.ADMIN_PATH_PREFIX, CharField())).values_list('admin_path_prefix', 'product_id', 'product__name')
-        except Exception as e:
-            self.loge(e)
-            return ''
-        else:
-            if not idxs:
-                return ''
-            content = format_html_join('\n', '<p><font color="green" face="Verdana, Geneva, sans-serif"><a href="{0}/refs/product/?id={1}" target="_blank">{2}</a></font></p>', idxs)
-            return format_html('<details><summary>{}</summary>{}</details>', idxs[0][2], content)
-    get_records.short_description = _('Products')
-
-    def get_sum_cost(self, obj):
-        full_sum = 0
-        try:
-            full_sum = Record.objects.filter(doc=obj).aggregate(full_sum=Sum(F('count')*F('cost')))['full_sum']
-        except Exception as e:
-            self.loge(e)
-        else:
-            if full_sum:
-                full_sum = full_sum.quantize(Decimal('0.00'))
-            else:
-                full_sum = 0
-        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{}</font>', full_sum)
-    get_sum_cost.short_description = _('sum cost')
-
-    def get_sum_price(self, obj):
-        full_sum = 0
-        try:
-            full_sum = Record.objects.filter(doc=obj).aggregate(full_sum=Sum(F('count')*F('price')))['full_sum']
-        except Exception as e:
-            self.loge(e)
-        else:
-            if full_sum:
-                full_sum = full_sum.quantize(Decimal('0.00'))
-            else:
-                full_sum = 0
-        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{}</font>', full_sum)
-    get_sum_price.short_description = _('sum price')
-
-    def recalculate_final_sum(self, request, queryset):
-        updated_count = 0
-        docs = []
-        for it in queryset:
-            value = None
-            if it.type.income:
-                value = Record.objects.filter(doc=it).aggregate(sum_final=Sum(F('count') * F('cost')))['sum_final']
-            else:
-                value = Record.objects.filter(doc=it).aggregate(sum_final=Sum(F('count') * F('price')))['sum_final']
-            if value is not None and it.sum_final != value:
-                it.sum_final = value
-                docs.append(it)
-        if docs:
-            try:
-                updated_count = Doc.objects.bulk_update(docs, ['sum_final'])
-            except Exception as e:
-                self.loge(e)
-        self.message_user(request, f'{_("updated")} {updated_count}', messages.SUCCESS)
-    recalculate_final_sum.short_description = f'🖩{_("recalculate final sum")}'
-
-admin.site.register(Doc, DocAdmin)
+class CustomModelAdmin(CoreBaseAdmin, admin.ModelAdmin):
+    pass
 
 
 class RecordAdmin(CustomModelAdmin):
     list_display = ('id', 'get_product', 'get_cost', 'get_price', 'get_count', 'get_sum_cost', 'get_sum_price', 'doc', 'extinfo')
     list_display_links = ('id',)
     search_fields = ('id', 'doc__owner__name', 'doc__contractor__name', 'doc__type__name', 'doc__tax__name', 'doc__sale_point__name', 'doc__author__username', 'extinfo')
+    list_select_related = ('product', 'doc')
+    autocomplete_fields = ('product', 'doc')
 
     def get_product(self, obj):
         return format_html('<a href="{}/refs/product/?id={}" target="_blank">{}</a>', settings.ADMIN_PATH_PREFIX, obj.product.id, obj.product.name)
@@ -216,3 +171,128 @@ class RegisterAdmin(CustomModelAdmin):
     get_sum_price.short_description = _('sum price')
 
 admin.site.register(Register, RegisterAdmin)
+
+
+class RecordInlines(CustomTabularInline):
+    model = Record
+    fields = ('product', 'count', 'cost', 'price')
+    list_select_related = ('product',)
+    autocomplete_fields = ('product',)
+
+
+class DocAdmin(CustomModelAdmin):
+    list_display = ('id', 'get_reg', 'created_at', 'registered_at', 'type', 'contractor', 'get_records', 'get_sum_cost', 'get_sum_price', 'sum_final', 'tax', 'owner', 'author', 'extinfo')
+    list_display_links = ('id', 'created_at', 'registered_at')
+    search_fields = ('id', 'created_at', 'registered_at', 'owner__name', 'contractor__name', 'type__name', 'tax__name', 'sale_point__name', 'author__username', 'extinfo')
+    list_filter = (DocTypeFilter, ContractorCompanyFilter, OwnerCompanyFilter)
+    actions = ('registration','recalculate_final_sum')
+    fieldsets = [
+    (
+        None,
+        {'fields': [('registered_at', 'sum_final', 'owner', 'contractor', 'type', 'tax')]}
+    ),
+    (
+        'Advanced options',
+        {
+            'classes': ['collapse'],
+            'fields': ['extinfo']
+        }
+    )
+    ]
+    inlines = [RecordInlines]
+
+    def save_model(self, request, instance, form, change):
+        current_user = request.user
+        instance = form.save(commit=False)
+        if not change or not instance.author:
+            instance.author = current_user
+        instance.save()
+        form.save_m2m()
+        return instance
+
+    def get_records(self, obj):
+        try:
+            idxs = Record.objects.filter(doc=obj).annotate(admin_path_prefix=Value(settings.ADMIN_PATH_PREFIX, CharField())).values_list('admin_path_prefix', 'product_id', 'product__name')
+        except Exception as e:
+            self.loge(e)
+            return ''
+        else:
+            if not idxs:
+                return ''
+            content = format_html_join('\n', '<p><font color="green" face="Verdana, Geneva, sans-serif"><a href="{0}/refs/product/?id={1}" target="_blank">{2}</a></font></p>', idxs)
+            return format_html('<details><summary>{}</summary>{}</details>', idxs[0][2], content)
+    get_records.short_description = _('Products')
+
+    def get_sum_cost(self, obj):
+        full_sum = 0
+        try:
+            full_sum = Record.objects.filter(doc=obj).aggregate(full_sum=Sum(F('count')*F('cost')))['full_sum']
+        except Exception as e:
+            self.loge(e)
+        else:
+            if full_sum:
+                full_sum = full_sum.quantize(Decimal('0.00'))
+            else:
+                full_sum = 0
+        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{}</font>', full_sum)
+    get_sum_cost.short_description = _('sum cost')
+
+    def get_sum_price(self, obj):
+        full_sum = 0
+        try:
+            full_sum = Record.objects.filter(doc=obj).aggregate(full_sum=Sum(F('count')*F('price')))['full_sum']
+        except Exception as e:
+            self.loge(e)
+        else:
+            if full_sum:
+                full_sum = full_sum.quantize(Decimal('0.00'))
+            else:
+                full_sum = 0
+        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{}</font>', full_sum)
+    get_sum_price.short_description = _('sum price')
+
+    def get_reg(self, obj):
+        return Register.objects.filter(rec__doc=obj).exists()
+    get_reg.short_description = '☑'
+    get_reg.help_text = _('registered')
+    get_reg.boolean = True
+
+    def registration(self, request, queryset):
+        updated_count = 0
+        for it in queryset.filter(type_id__in=get_model('refs.DocType').objects.filter(auto_register=True).values('id')):
+            all_reg = False
+            for r in Record.objects.filter(doc=it):
+                if not Register.objects.filter(rec=r).exists():
+                    try:
+                        Register(rec=r).save()
+                    except Exception as e:
+                        self.loge(e)
+                        break
+                    else:
+                        all_reg = True
+            if all_reg:
+                updated_count += 1
+        self.message_user(request, f'{_("updated")} {updated_count} ☑', messages.SUCCESS)
+    registration.short_description = f'✅{_("registration for accaunting")}👌'
+
+    def recalculate_final_sum(self, request, queryset):
+        updated_count = 0
+        docs = []
+        for it in queryset:
+            value = None
+            if it.type.income:
+                value = Record.objects.filter(doc=it).aggregate(sum_final=Sum(F('count') * F('cost')))['sum_final']
+            else:
+                value = Record.objects.filter(doc=it).aggregate(sum_final=Sum(F('count') * F('price')))['sum_final']
+            if value is not None and it.sum_final != value:
+                it.sum_final = value
+                docs.append(it)
+        if docs:
+            try:
+                updated_count = Doc.objects.bulk_update(docs, ['sum_final'])
+            except Exception as e:
+                self.loge(e)
+        self.message_user(request, f'{_("updated")} {updated_count}', messages.SUCCESS)
+    recalculate_final_sum.short_description = f'🖩{_("recalculate final sum")}'
+
+admin.site.register(Doc, DocAdmin)

@@ -412,9 +412,14 @@ admin.site.register(CompanyType, CompanyTypeAdmin)
 
 
 class DocTypeAdmin(CustomModelAdmin):
-    list_display = ('id', 'alias', 'name', 'income', 'description')
+    list_display = ('id', 'alias', 'name', 'income', 'auto_register', 'description', 'get_count')
     list_display_links = ('id', 'alias', 'name')
     search_fields = ('id', 'alias', 'name', 'description')
+
+    def get_count(self, obj):
+        return format_html('<a href="{}/core/doc/?type_id={}" target="_blank">{}</a>', settings.ADMIN_PATH_PREFIX, obj.id, get_model('core.Doc').objects.filter(type_id=obj.id).count())
+    get_count.short_description = _('count')
+
 admin.site.register(DocType, DocTypeAdmin)
 
 
