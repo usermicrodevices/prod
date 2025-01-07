@@ -339,6 +339,88 @@ class CustomModelAdmin(admin.ModelAdmin):
             msg += f'::{arg}'
         logging.error(msg)
 
+    def worksheet_cell_write(self, worksheet, row, col, value, type_value = None, fmt = None):
+        func_write = worksheet.write
+        if type_value == 'as_number':
+            func_write = worksheet.write_number
+        elif type_value == 'as_datetime':
+            func_write = worksheet.write_datetime
+        try:
+            if fmt:
+                func_write(row, col, value, fmt)
+            else:
+                func_write(row, col, value)
+        except Exception as e:
+            try:
+                if fmt:
+                    func_write(row, col, repr(value), fmt)
+                else:
+                    func_write(row, col, repr(value))
+            except Exception as e:
+                self.loge(e, row, col)
+        return col + 1
+
+    def queryset_to_xls(self, request, queryset, fields={}, exclude_fields=['id']):
+        import xlsxwriter
+        output = None
+        if queryset.count():
+            field_names = list(fields.keys())
+            if not field_names:
+                for field in queryset.model._meta.get_fields():
+                    if field.name and field.name not in exclude_fields:
+                        field_names.append(field.name)
+            output = BytesIO()
+            workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+            worksheet = workbook.add_worksheet()
+            cell_format_bold = workbook.add_format({'align':'center', 'valign':'vcenter', 'bold':True})
+            cell_format_left = workbook.add_format({'align':'left', 'valign':'vcenter'})
+            col = 0
+            for field_name in field_names:
+                field_title = field_name
+                if field_name in fields:
+                    width = fields[field_name].get('width', None)
+                    if width is not None:
+                        worksheet.set_column(col, col, width)
+                    field_title = fields[field_name].get('title', field_title)
+                col = self.worksheet_cell_write(worksheet, 0, col, _(field_title), fmt=cell_format_bold)
+            row = 1
+            for item in queryset:
+                worksheet.set_row(row, None, cell_format_left)
+                col = 0
+                for field_name in field_names:
+                    if not hasattr(item, field_name):
+                        col += 1
+                        continue
+                    else:
+                        if not field_name:
+                            col += 1
+                            continue
+                    try:
+                        value = getattr(item, field_name)
+                    except AttributeError as e:
+                        col += 1
+                        self.loge(e)
+                    except Exception as e:
+                        col += 1
+                        self.loge(e)
+                    else:
+                        if not value:
+                            col += 1
+                        else:
+                            format_value = None
+                            tvalue = None
+                            if isinstance(value, datetime):
+                                value = f'{value.strftime("%Y.%m.%d %H:%M:%S")}'
+                            elif isinstance(value, (int, float)):
+                                tvalue = 'as_number'
+                            elif not isinstance(value, str):
+                                value = f'{value}'
+                            col = self.worksheet_cell_write(worksheet, row, col, value, tvalue, format_value)
+                row += 1
+            workbook.close()
+            output.seek(0)
+        return output
+
 
 class UnitAdmin(CustomModelAdmin):
     list_display = ('id', 'name', 'label')
@@ -540,88 +622,6 @@ class ProductAdmin(CustomModelAdmin):
 
     #class Media:
         #js = ['admin/js/autocomplete.js', 'admin/js/vendor/select2/select2.full.js']
-
-    def worksheet_cell_write(self, worksheet, row, col, value, type_value = None, fmt = None):
-        func_write = worksheet.write
-        if type_value == 'as_number':
-            func_write = worksheet.write_number
-        elif type_value == 'as_datetime':
-            func_write = worksheet.write_datetime
-        try:
-            if fmt:
-                func_write(row, col, value, fmt)
-            else:
-                func_write(row, col, value)
-        except Exception as e:
-            try:
-                if fmt:
-                    func_write(row, col, repr(value), fmt)
-                else:
-                    func_write(row, col, repr(value))
-            except Exception as e:
-                self.loge(e, row, col)
-        return col + 1
-
-    def queryset_to_xls(self, request, queryset, fields={}, exclude_fields=['id']):
-        import xlsxwriter
-        output = None
-        if queryset.count():
-            field_names = list(fields.keys())
-            if not field_names:
-                for field in queryset.model._meta.get_fields():
-                    if field.name and field.name not in exclude_fields:
-                        field_names.append(field.name)
-            output = BytesIO()
-            workbook = xlsxwriter.Workbook(output, {'in_memory': True})
-            worksheet = workbook.add_worksheet()
-            cell_format_bold = workbook.add_format({'align':'center', 'valign':'vcenter', 'bold':True})
-            cell_format_left = workbook.add_format({'align':'left', 'valign':'vcenter'})
-            col = 0
-            for field_name in field_names:
-                field_title = field_name
-                if field_name in fields:
-                    width = fields[field_name].get('width', None)
-                    if width is not None:
-                        worksheet.set_column(col, col, width)
-                    field_title = fields[field_name].get('title', field_title)
-                col = self.worksheet_cell_write(worksheet, 0, col, _(field_title), fmt=cell_format_bold)
-            row = 1
-            for item in queryset:
-                worksheet.set_row(row, None, cell_format_left)
-                col = 0
-                for field_name in field_names:
-                    if not hasattr(item, field_name):
-                        col += 1
-                        continue
-                    else:
-                        if not field_name:
-                            col += 1
-                            continue
-                    try:
-                        value = getattr(item, field_name)
-                    except AttributeError as e:
-                        col += 1
-                        self.loge(e)
-                    except Exception as e:
-                        col += 1
-                        self.loge(e)
-                    else:
-                        if not value:
-                            col += 1
-                        else:
-                            format_value = None
-                            tvalue = None
-                            if isinstance(value, datetime):
-                                value = f'{value.strftime("%Y.%m.%d %H:%M:%S")}'
-                            elif isinstance(value, (int, float)):
-                                tvalue = 'as_number'
-                            elif not isinstance(value, str):
-                                value = f'{value}'
-                            col = self.worksheet_cell_write(worksheet, row, col, value, tvalue, format_value)
-                row += 1
-            workbook.close()
-            output.seek(0)
-        return output
 
     def get_last_reg(self, obj):
         if obj.id in self.__objs__ and 'lreg' in self.__objs__[obj.id]:
