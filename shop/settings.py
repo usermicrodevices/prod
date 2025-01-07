@@ -183,3 +183,5 @@ window.onfocus=function(){setTimeout(function(){window.location.reload();},0);}
 }
 </script>'''
 }
+
+ADMIN_SET_DOCUMENT_RECORD_PRICES = {'check_empty_cost':False, 'check_empty_price':False}

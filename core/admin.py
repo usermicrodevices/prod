@@ -89,6 +89,103 @@ class CoreBaseAdmin():
             msg += f'::{arg}'
         logging.error(msg)
 
+    def worksheet_cell_write(self, worksheet, row, col, value, type_value = None, fmt = None):
+        func_write = worksheet.write
+        if type_value == 'as_number':
+            func_write = worksheet.write_number
+        elif type_value == 'as_datetime':
+            func_write = worksheet.write_datetime
+        try:
+            if fmt:
+                func_write(row, col, value, fmt)
+            else:
+                func_write(row, col, value)
+        except Exception as e:
+            try:
+                if fmt:
+                    func_write(row, col, repr(value), fmt)
+                else:
+                    func_write(row, col, repr(value))
+            except Exception as e:
+                self.loge(e, row, col)
+        return col + 1
+
+    def fill_workbook(self, workbook, request, queryset, fields, field_names, header={}, sheet_name=''):
+        worksheet = workbook.add_worksheet(sheet_name)
+        cell_format_bold = workbook.add_format({'align':'center', 'valign':'vcenter', 'bold':True})
+        cell_format_left = workbook.add_format({'align':'left', 'valign':'vcenter'})
+        row = 0
+        for column, content in header.items():
+            value = content.get('value')
+            if value is not None:
+                cell_fmt = content.get('format')
+                if cell_fmt:
+                    cell_fmt = workbook.add_format(cell_fmt)
+                else:
+                    cell_fmt = cell_format_bold
+                self.worksheet_cell_write(worksheet, row, column, value, fmt=cell_fmt)
+        row += 1
+        col = 0
+        for field_name in field_names:
+            field_title = field_name
+            if field_name in fields:
+                width = fields[field_name].get('width', None)
+                if width is not None:
+                    worksheet.set_column(col, col, width)
+                field_title = fields[field_name].get('title', field_title)
+            col = self.worksheet_cell_write(worksheet, row, col, _(field_title), fmt=cell_format_bold)
+        row += 1
+        for item in queryset:
+            worksheet.set_row(row, None, cell_format_left)
+            col = 0
+            for field_name in field_names:
+                if not hasattr(item, field_name):
+                    col += 1
+                    continue
+                else:
+                    if not field_name:
+                        col += 1
+                        continue
+                try:
+                    value = getattr(item, field_name)
+                except AttributeError as e:
+                    col += 1
+                    self.loge(e)
+                except Exception as e:
+                    col += 1
+                    self.loge(e)
+                else:
+                    if not value:
+                        col += 1
+                    else:
+                        format_value = None
+                        tvalue = None
+                        if isinstance(value, datetime):
+                            value = f'{value.strftime("%Y.%m.%d %H:%M:%S")}'
+                        elif isinstance(value, (int, float)):
+                            tvalue = 'as_number'
+                        elif not isinstance(value, str):
+                            value = f'{value}'
+                        col = self.worksheet_cell_write(worksheet, row, col, value, tvalue, format_value)
+            row += 1
+
+    def queryset_to_xls(self, request, queryset, fields={}, exclude_fields=['id'], header={}, sheet_name=''):
+        import xlsxwriter
+        output = None
+        if queryset.count():
+            field_names = list(fields.keys())
+            if not field_names:
+                for field in queryset.model._meta.get_fields():
+                    if field.name and field.name not in exclude_fields:
+                        field_names.append(field.name)
+            output = BytesIO()
+            wbk = xlsxwriter.Workbook(output, {'in_memory': True})
+            self.fill_workbook(wbk, request, queryset, fields, field_names, header, sheet_name)
+            wbk.close()
+            output.seek(0)
+        return output
+
+
 class CustomStackedInline(CoreBaseAdmin, admin.StackedInline):
     pass
 
@@ -178,28 +275,47 @@ admin.site.register(Register, RegisterAdmin)
 @html_safe
 class JSProductRelationsSet:
     def __str__(self):
-        return '''<script>
+        set_cost_code = 'elem_cost.val(evt.params.data.cost);'
+        if settings.ADMIN_SET_DOCUMENT_RECORD_PRICES.get('check_empty_cost', False):
+            set_cost_code = f'if(!elem_cost.val() || elem_cost.val()==0) {set_cost_code}'
+        set_price_code = 'elem_price.val(evt.params.data.price);'
+        if settings.ADMIN_SET_DOCUMENT_RECORD_PRICES.get('check_empty_price', False):
+            set_price_code = f'if(!elem_price.val() || elem_price.val()==0) {set_price_code}'
+        return '''<script>'use strict';
 window.onload = (event) => {
+const $ = django.jQuery;
 const observer = new MutationObserver((mutations, observer) => {
-//console.log(mutations, observer);
 for (const mutation of mutations) {
-    //if (mutation.type === "childList") {
-        //console.log("A child node has been added or removed.");
-    //} else
-    //if (mutation.type === "attributes" && mutation.attributeName==="title" && mutation.target.id.indexOf("-product-container")) {
-    if (mutation.type === "attributes" && mutation.attributeName==="data-select2-id") {
-        //console.log(`The ${mutation.attributeName} attribute was modified.`);
-        console.log(mutation.target, mutation.target.id);
-        //console.log(mutation, mutation.target.id);
+    if(mutation.type==="attributes" && (mutation.attributeName==="tabindex" || mutation.attributeName==="data-select2-id")) {
+        const field_product = $('div[data-model-ref="product"]');
+        field_product.on('select2:close', function(evt) {
+            field_product.trigger('change.select2');
+        });
+        field_product.on('select2:select', function(evt) {
+            if(evt.params.data){
+                const row_id = evt.target.id.match(/\d+/)[0]
+                if("cost" in evt.params.data){
+                    const elem_cost = $('#id_record_set-'+row_id+'-cost');
+                    ''' + set_cost_code + '''
+                }
+                if("price" in evt.params.data){
+                    const elem_price = $('#id_record_set-'+row_id+'-price');
+                    ''' + set_price_code + '''
+                }
+            }
+        });
+        field_product.on('select2:clear', function(evt) {
+            const row_id = evt.target.id.match(/\d+/)[0]
+            $('#id_record_set-'+row_id+'-count').val();
+            $('#id_record_set-'+row_id+'-cost').val();
+            $('#id_record_set-'+row_id+'-price').val();
+        });
     }
+    break;
 }
 });
 observer.observe(document, {childList:true, subtree:true, attributes:true});
-//document.addEventListener("DOMSubtreeModified", (e) => {
-//console.log(e);
-//});
-}
-</script>'''
+}</script>'''
 
 
 class ProductAutocompleteJsonView(CoreBaseAdmin, AutocompleteJsonView):
@@ -227,7 +343,7 @@ class DocAdmin(CustomModelAdmin):
     list_display_links = ('id', 'created_at', 'registered_at')
     search_fields = ('id', 'created_at', 'registered_at', 'owner__name', 'contractor__name', 'type__name', 'tax__name', 'sale_point__name', 'author__username', 'extinfo')
     list_filter = (DocTypeFilter, ContractorCompanyFilter, OwnerCompanyFilter)
-    actions = ('registration','recalculate_final_sum')
+    actions = ('registration','recalculate_final_sum', 'order_to_xls')
     fieldsets = [
     (
         None,
@@ -243,8 +359,9 @@ class DocAdmin(CustomModelAdmin):
     ]
     inlines = [RecordInlines]
 
-    #class Media:
-        #js = (JSProductRelationsSet(),)
+    class Media:
+        #extend = False
+        js = (JSProductRelationsSet(),)
 
     def save_model(self, request, instance, form, change):
         current_user = request.user
@@ -318,7 +435,7 @@ class DocAdmin(CustomModelAdmin):
             if all_reg:
                 updated_count += 1
         self.message_user(request, f'{_("updated")} {updated_count} ☑', messages.SUCCESS)
-    registration.short_description = f'✅{_("registration for accaunting")}👌'
+    registration.short_description = f'✅ {_("registration for accaunting")} 👌'
 
     def recalculate_final_sum(self, request, queryset):
         updated_count = 0
@@ -338,6 +455,18 @@ class DocAdmin(CustomModelAdmin):
             except Exception as e:
                 self.loge(e)
         self.message_user(request, f'{_("updated")} {updated_count}', messages.SUCCESS)
-    recalculate_final_sum.short_description = f'🖩{_("recalculate final sum")}'
+    recalculate_final_sum.short_description = f'🖩 {_("recalculate final sum")} 🖩'
+
+    def order_to_xls(self, request, queryset):
+        doc = queryset.first()
+        records = get_model('core.Record').objects.filter(doc_id__in=queryset.filter(type__alias='order').values('id')).distinct()
+        ts = django_timezone.now().strftime('%Y%m%d%H%M%S')
+        output = self.queryset_to_xls(request, records, {'product':{'width':50}, 'count':{'width':20}}, header={0:{'value':doc.contractor.name, 'format':{'align':'left', 'valign':'vcenter'}}, 1:{'value':doc.registered_at.strftime('%Y-%m-%d %H:%M:%S'), 'format':{'align':'left', 'valign':'vcenter'}}}, sheet_name=ts)
+        if output:
+            fn = f'order{doc.id}_{ts}.xlsx'
+            self.message_user(request, f'🆗 {_("Finished")} ✏️({fn})', messages.SUCCESS)
+            return FileResponse(output, as_attachment=True, filename=fn)
+        self.message_user(request, _('please select items'), messages.ERROR)
+    order_to_xls.short_description = f'⚔📋 {_("order to XLS file")} 📋↘'
 
 admin.site.register(Doc, DocAdmin)
