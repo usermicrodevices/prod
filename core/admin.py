@@ -9,18 +9,20 @@ except:
 
 from django.utils import timezone as django_timezone
 from django.utils.translation import gettext as _
-from django.utils.html import format_html, format_html_join
-from django.urls import reverse
+from django.utils.html import format_html, format_html_join, html_safe
 from django.utils.safestring import mark_safe
-from django.contrib import admin, messages
+from django.urls import path, reverse
 from django import forms
-from django.http import StreamingHttpResponse, FileResponse, HttpResponseRedirect
-from django.contrib.auth.forms import ReadOnlyPasswordHashField
+from django.http import StreamingHttpResponse, FileResponse, HttpResponseRedirect, JsonResponse
 from django.db.models import F, Q, Min, Max, Sum, Value, Count, IntegerField, TextField, CharField, OuterRef, Subquery
 from django.db.models.query import QuerySet
 from django.db import connections
+from django.contrib.auth.forms import ReadOnlyPasswordHashField
+from django.contrib import admin, messages
 from django.contrib.admin.models import LogEntry
 from django.contrib.admin.widgets import AutocompleteSelect
+from django.contrib.admin.sites import AdminSite
+from django.contrib.admin.views.autocomplete import AutocompleteJsonView
 from django.shortcuts import render
 from django.views.generic.edit import FormView
 from django.core.cache import caches
@@ -173,11 +175,51 @@ class RegisterAdmin(CustomModelAdmin):
 admin.site.register(Register, RegisterAdmin)
 
 
+@html_safe
+class JSProductRelationsSet:
+    def __str__(self):
+        return '''<script>
+window.onload = (event) => {
+const observer = new MutationObserver((mutations, observer) => {
+//console.log(mutations, observer);
+for (const mutation of mutations) {
+    //if (mutation.type === "childList") {
+        //console.log("A child node has been added or removed.");
+    //} else
+    //if (mutation.type === "attributes" && mutation.attributeName==="title" && mutation.target.id.indexOf("-product-container")) {
+    if (mutation.type === "attributes" && mutation.attributeName==="data-select2-id") {
+        //console.log(`The ${mutation.attributeName} attribute was modified.`);
+        console.log(mutation.target, mutation.target.id);
+        //console.log(mutation, mutation.target.id);
+    }
+}
+});
+observer.observe(document, {childList:true, subtree:true, attributes:true});
+//document.addEventListener("DOMSubtreeModified", (e) => {
+//console.log(e);
+//});
+}
+</script>'''
+
+
+class ProductAutocompleteJsonView(CoreBaseAdmin, AutocompleteJsonView):
+    def serialize_result(self, obj, to_field_name):
+        return super().serialize_result(obj, to_field_name) | {'cost':obj.cost, 'price':obj.price}
+
+
+def autocomplete_view(request):
+    if request.GET['model_name'] == 'record':
+        return ProductAutocompleteJsonView.as_view(admin_site=admin.site)(request)
+    return AutocompleteJsonView.as_view(admin_site=admin.site)(request)
+admin.site.autocomplete_view = autocomplete_view
+
+
 class RecordInlines(CustomTabularInline):
     model = Record
     fields = ('product', 'count', 'cost', 'price')
     list_select_related = ('product',)
     autocomplete_fields = ('product',)
+    extra = 0
 
 
 class DocAdmin(CustomModelAdmin):
@@ -200,6 +242,9 @@ class DocAdmin(CustomModelAdmin):
     )
     ]
     inlines = [RecordInlines]
+
+    #class Media:
+        #js = (JSProductRelationsSet(),)
 
     def save_model(self, request, instance, form, change):
         current_user = request.user
