@@ -284,37 +284,30 @@ class JSProductRelationsSet:
         return '''<script>'use strict';
 window.onload = (event) => {
 const $ = django.jQuery;
-const observer = new MutationObserver((mutations, observer) => {
-for (const mutation of mutations) {
-    if(mutation.type==="attributes" && (mutation.attributeName==="tabindex" || mutation.attributeName==="data-select2-id")) {
-        const field_product = $('div[data-model-ref="product"]');
-        field_product.on('select2:close', function(evt) {
-            field_product.trigger('change.select2');
-        });
-        field_product.on('select2:select', function(evt) {
-            if(evt.params.data){
-                const row_id = evt.target.id.match(/\d+/)[0]
-                if("cost" in evt.params.data){
-                    const elem_cost = $('#id_record_set-'+row_id+'-cost');
-                    ''' + set_cost_code + '''
-                }
-                if("price" in evt.params.data){
-                    const elem_price = $('#id_record_set-'+row_id+'-price');
-                    ''' + set_price_code + '''
-                }
-            }
-        });
-        field_product.on('select2:clear', function(evt) {
-            const row_id = evt.target.id.match(/\d+/)[0]
-            $('#id_record_set-'+row_id+'-count').val();
-            $('#id_record_set-'+row_id+'-cost').val();
-            $('#id_record_set-'+row_id+'-price').val();
-        });
-    }
-    break;
-}
+const field_product = $('div[data-model-ref="product"]');
+field_product.on('select2:close', function(evt) {
+    field_product.trigger('change.select2');
 });
-observer.observe(document, {childList:true, subtree:true, attributes:true});
+field_product.on('select2:select', function(evt) {
+    if(evt.params.data){
+        const row_id = evt.target.id.match(/\d+/)[0];
+        $('#id_record_set-'+row_id+'-count').val(function(i, oldval){return parseFloat(oldval)+1;});
+        if("cost" in evt.params.data){
+            const elem_cost = $('#id_record_set-'+row_id+'-cost');
+            ''' + set_cost_code + '''
+        }
+        if("price" in evt.params.data){
+            const elem_price = $('#id_record_set-'+row_id+'-price');
+            ''' + set_price_code + '''
+        }
+    }
+});
+field_product.on('select2:clear', function(evt) {
+    const row_id = evt.target.id.match(/\d+/)[0]
+    $('#id_record_set-'+row_id+'-count').val();
+    $('#id_record_set-'+row_id+'-cost').val();
+    $('#id_record_set-'+row_id+'-price').val();
+});
 }</script>'''
 
 
