@@ -553,3 +553,6 @@ msgstr "регистрация для бухгалтерского учета"
 
 msgid "order to XLS file"
 msgstr "заказ в файл XLS"
+
+msgid "fix barcodes"
+msgstr "исправить штрихкоды"

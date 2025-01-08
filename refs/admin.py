@@ -618,7 +618,7 @@ class ProductAdmin(CustomModelAdmin):
     list_select_related = ('tax', 'model', 'group')
     list_filter = (ProductGroupFilter, ProductManufacturerFilter, ProductModelFilter, TaxFilter)
     autocomplete_fields = ('tax', 'model', 'group', 'barcodes', 'qrcodes')
-    actions = ('from_xls', 'to_xls', 'price_to_xls', 'barcode_to_svg')
+    actions = ('from_xls', 'to_xls', 'price_to_xls', 'barcode_to_svg', 'fix_barcodes')
 
     #class Media:
         #js = ['admin/js/autocomplete.js', 'admin/js/vendor/select2/select2.full.js']
@@ -739,6 +739,7 @@ class ProductAdmin(CustomModelAdmin):
     get_group.admin_order_field = 'group'
 
     def from_xls(self, request, queryset, **kwargs):
+        from barcode import EAN13
         from transliterate import slugify
         from openpyxl import load_workbook
         form = None
@@ -786,7 +787,7 @@ class ProductAdmin(CustomModelAdmin):
                                                     self.loge(e)
                                                     unit = None
                                             if unit:
-                                            	units[p_unit] = unit
+                                                units[p_unit] = unit
                                         if p_unit not in units:
                                             product_kwargs['unit'] = units[p_unit]
                                     if p_group:
@@ -795,7 +796,8 @@ class ProductAdmin(CustomModelAdmin):
                                         product_kwargs['group'] = groups[p_group]
                                     p = Product(**product_kwargs)
                                     products.append(p)
-                                    ext_attrs[p.article] = {'barcode':f'{p_barcode if p_barcode else (timestamp+row_index)*1000}', 'count':p_count}
+                                    ext_attrs[p.article] = {'barcode':f'{p_barcode if p_barcode else EAN13(f'{round(time.time()*1000)}').ean}', 'count':p_count}
+                                    time.sleep(.01)#FOR STRONG NEXT EAN13 GENERATION
                     if products:
                         try:
                             objs = Product.objects.bulk_create(products)
@@ -927,5 +929,45 @@ class ProductAdmin(CustomModelAdmin):
         svgs = f'<div id="section-to-print"><style>@media {css_media_orientation} print{{html body{{visibility:hidden;height:auto;margin:0;padding:0;}} .content{{position:absolute;top:0;}} .messagelist{{margin:0;padding:0;}} #section-to-print{{text-align:center;background-color:white;width:0;display:flex;flex-direction:column;visibility:visible;position:absolute;left:0;top:0;}}}} @page{{size: {svg_width} {svg_height} {css_media_page_size_ext};margin:0;}} .page-pad{{page-break-after:always;margin:0;padding:0;}} .page-pad:last-of-type{{page-break-after:avoid!important;}}{css_media_ext}</style>{print_button}{print_script}' + re.sub('(<!--.*?-->)', '', svgs, flags=re.DOTALL) + '</div>'
         self.message_user(request, mark_safe(svgs), messages.SUCCESS)
     barcode_to_svg.short_description = f'🖶{_("print barcode as SVG")}🖼'
+
+    def fix_barcodes(self, request, queryset):
+        from barcode import EAN13
+        msg = ''
+        delete_bcodes = []
+        fixcount = 0
+        for it in queryset:
+            for bcode in it.barcodes.all():
+                b = EAN13(bcode.id)
+                if b.ean != bcode.id:
+                    if settings.DEBUG:
+                        self.logw('INVALID', bcode.id)
+                    it.barcodes.remove(bcode)
+                    delete_bcodes.append(bcode.id)
+                    if BarCode.objects.filter(id=b.ean).exists():
+                        b = EAN13(f'{round(time.time()*1000)}')
+                    bcode = BarCode(b.ean)
+                    try:
+                       bcode.save()
+                    except Exception as e:
+                       self.loge(e)
+                    else:
+                        it.barcodes.add(bcode)
+                        if settings.DEBUG:
+                            self.logw('FIXED TO', bcode.id)
+                        fixcount += 1
+        if fixcount:
+            msg += f'FIXED {fixcount}'
+        if delete_bcodes:
+            try:
+                dresult = BarCode.objects.filter(id__in=delete_bcodes).delete()
+            except Exception as e:
+                self.loge(e)
+            else:
+                m = f'DELETED {dresult}'
+                if settings.DEBUG:
+                    self.logi(m)
+                msg += f'; {m}'
+        self.message_user(request, msg, messages.SUCCESS)
+    fix_barcodes.short_description = f'Ⅲ🔨 {_("fix barcodes")} 🔧'
 
 admin.site.register(Product, ProductAdmin)
