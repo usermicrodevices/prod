@@ -556,3 +556,15 @@ msgstr "заказ в файл XLS"
 
 msgid "fix barcodes"
 msgstr "исправить штрихкоды"
+
+msgid "code"
+msgstr "код"
+
+msgid "Documents is empy"
+msgstr "Документы пустые"
+
+msgid "unloaded"
+msgstr "выгружено"
+
+msgid "Finished"
+msgstr "Завершено"

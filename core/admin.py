@@ -110,7 +110,7 @@ class CoreBaseAdmin():
                 self.loge(e, row, col)
         return col + 1
 
-    def fill_workbook(self, workbook, request, queryset, fields, field_names, header={}, sheet_name=''):
+    def fill_workbook(self, workbook, queryset, fields, field_names, header={}, sheet_name=''):
         worksheet = workbook.add_worksheet(sheet_name)
         cell_format_bold = workbook.add_format({'align':'center', 'valign':'vcenter', 'bold':True})
         cell_format_left = workbook.add_format({'align':'left', 'valign':'vcenter'})
@@ -169,7 +169,7 @@ class CoreBaseAdmin():
                         col = self.worksheet_cell_write(worksheet, row, col, value, tvalue, format_value)
             row += 1
 
-    def queryset_to_xls(self, request, queryset, fields={}, exclude_fields=['id'], header={}, sheet_name=''):
+    def queryset_to_xls(self, queryset, fields={}, exclude_fields=['id'], header={}, sheet_name=''):
         import xlsxwriter
         output = None
         if queryset.count():
@@ -180,7 +180,7 @@ class CoreBaseAdmin():
                         field_names.append(field.name)
             output = BytesIO()
             wbk = xlsxwriter.Workbook(output, {'in_memory': True})
-            self.fill_workbook(wbk, request, queryset, fields, field_names, header, sheet_name)
+            self.fill_workbook(wbk, queryset, fields, field_names, header, sheet_name)
             wbk.close()
             output.seek(0)
         return output
@@ -451,15 +451,49 @@ class DocAdmin(CustomModelAdmin):
     recalculate_final_sum.short_description = f'🖩 {_("recalculate final sum")} 🖩'
 
     def order_to_xls(self, request, queryset):
-        doc = queryset.first()
-        records = get_model('core.Record').objects.filter(doc_id__in=queryset.filter(type__alias='order').values('id')).distinct()
+        import xlsxwriter
+        if not queryset.count():
+            self.message_user(request, _('please select items'), messages.ERROR)
+            return
+
+        rcount = get_model('core.Record').objects.filter(doc_id__in=queryset.filter(type__alias='order').values('id')).distinct().count()
+        if not rcount:
+            self.message_user(request, f'🆗 {_("Finished")}. {_("Documents is empy")}.', messages.SUCCESS)
+            return
+
         ts = django_timezone.now().strftime('%Y%m%d%H%M%S')
-        output = self.queryset_to_xls(request, records, {'product':{'width':50}, 'count':{'width':20}}, header={0:{'value':doc.contractor.name, 'format':{'align':'left', 'valign':'vcenter'}}, 1:{'value':doc.registered_at.strftime('%Y-%m-%d %H:%M:%S'), 'format':{'align':'left', 'valign':'vcenter'}}}, sheet_name=ts)
-        if output:
-            fn = f'order{doc.id}_{ts}.xlsx'
-            self.message_user(request, f'🆗 {_("Finished")} ✏️({fn})', messages.SUCCESS)
-            return FileResponse(output, as_attachment=True, filename=fn)
-        self.message_user(request, _('please select items'), messages.ERROR)
+        output = BytesIO()
+        wbk = xlsxwriter.Workbook(output, {'in_memory': True})
+        worksheet = wbk.add_worksheet(ts)
+        cell_format_center_bold = wbk.add_format({'align':'center', 'valign':'vcenter', 'bold':True})
+        cell_format_left = wbk.add_format({'align':'left', 'valign':'vcenter'})
+        cell_format_left_bold = wbk.add_format({'align':'left', 'valign':'vcenter', 'bold':True, 'bg_color':'#FFFFAA'})
+        cell_format_right = wbk.add_format({'align':'right', 'valign':'vcenter'})
+        worksheet.set_column(1, 1, 50)
+        worksheet.set_column(2, 2, 20)
+        row = 0
+        col = 0
+        col = self.worksheet_cell_write(worksheet, row, col, _('code'), fmt=cell_format_center_bold)
+        col = self.worksheet_cell_write(worksheet, row, col, _('name'), fmt=cell_format_center_bold)
+        col = self.worksheet_cell_write(worksheet, row, col, _('count'), fmt=cell_format_center_bold)
+        row += 1
+        for d in queryset:
+            row += 2
+            dinfo = f'{d.contractor.name} ([{d.type.name} {d.id}] {d.registered_at.strftime('%Y-%m-%d %H:%M:%S')})'
+            worksheet.merge_range(f'A{row}:C{row}', dinfo, cell_format_left_bold)
+            records = get_model('core.Record').objects.filter(doc=d)
+            for r in records:
+                fields = {'product':{'width':50}, 'count':{'width':20}}
+                col = 0
+                col = self.worksheet_cell_write(worksheet, row, col, r.product.id, fmt=cell_format_left)
+                col = self.worksheet_cell_write(worksheet, row, col, r.product.name, fmt=cell_format_left)
+                col = self.worksheet_cell_write(worksheet, row, col, r.count, fmt=cell_format_right)
+                row += 1
+        wbk.close()
+        output.seek(0)
+        fn = f'orders_{ts}.xlsx'
+        self.message_user(request, f'🆗 {_("Finished")} ✏️({fn}); {_("unloaded")} {rcount}', messages.SUCCESS)
+        return FileResponse(output, as_attachment=True, filename=fn)
     order_to_xls.short_description = f'⚔📋 {_("order to XLS file")} 📋↘'
 
 admin.site.register(Doc, DocAdmin)

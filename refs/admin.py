@@ -360,7 +360,7 @@ class CustomModelAdmin(admin.ModelAdmin):
                 self.loge(e, row, col)
         return col + 1
 
-    def queryset_to_xls(self, request, queryset, fields={}, exclude_fields=['id']):
+    def queryset_to_xls(self, queryset, fields={}, exclude_fields=['id']):
         import xlsxwriter
         output = None
         if queryset.count():
@@ -859,7 +859,7 @@ class ProductAdmin(CustomModelAdmin):
     from_xls.short_description = f'⚔{_("load from XLS file")}'
 
     def to_xls(self, request, queryset):
-        output = self.queryset_to_xls(request, queryset.annotate(unit_name=F('unit__name'), barcode_first=F('barcodes__id'), qrcode_first=F('qrcodes__id')), {'group':{'width':20}, 'name':{'width':20}, 'article':{'width':20}, 'barcode_first':{'width':20, 'title':'barcode'}, 'unit_name':{'title':'unit'}, 'cost':{}, 'price':{}, 'qrcode_first':{'width':20, 'title':'qrcode'}})
+        output = self.queryset_to_xls(queryset.annotate(unit_name=F('unit__name'), barcode_first=F('barcodes__id'), qrcode_first=F('qrcodes__id')), {'group':{'width':20}, 'name':{'width':20}, 'article':{'width':20}, 'barcode_first':{'width':20, 'title':'barcode'}, 'unit_name':{'title':'unit'}, 'cost':{}, 'price':{}, 'qrcode_first':{'width':20, 'title':'qrcode'}})
         if output:
             fn = '{}.xlsx'.format(django_timezone.now().strftime('%Y%m%d%H%M%S'))
             self.message_user(request, f'🆗 {_("Finished")} ✏️({fn})', messages.SUCCESS)
@@ -870,7 +870,7 @@ class ProductAdmin(CustomModelAdmin):
     def price_to_xls(self, request, queryset):
         last_register = get_model('core.Register').objects.filter(rec__product_id=OuterRef('pk')).order_by('-rec__doc__registered_at')[:1]
         queryset = queryset.annotate(last_price=Subquery(last_register.values('rec__price')))
-        output = self.queryset_to_xls(request, queryset, {'article':{'width':30}, 'name':{'width':50}, 'last_price':{'width':20, 'title':'price'}})
+        output = self.queryset_to_xls(queryset, {'article':{'width':30}, 'name':{'width':50}, 'last_price':{'width':20, 'title':'price'}})
         if output:
             fn = '{}.xlsx'.format(django_timezone.now().strftime('%Y%m%d%H%M%S'))
             self.message_user(request, f'🆗 {_("Finished")} ✏️({fn})', messages.SUCCESS)
