@@ -62,8 +62,8 @@ WSGI_APPLICATION = 'shop.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'ashop',
-        'USER': 'ashop',
+        'NAME': 'shop',
+        'USER': 'shop',
         'PASSWORD': '',
         'HOST': '127.0.0.1',
         'PORT': '5432',
@@ -131,7 +131,7 @@ LOGGING = {
         'file': {
             'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': 'logs/ashop.log',
+            'filename': 'logs/shop.log',
             'formatter': 'verbose',
             'backupCount': 31,
             'when': 'midnight'
