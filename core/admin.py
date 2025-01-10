@@ -14,7 +14,7 @@ from django.utils.safestring import mark_safe
 from django.urls import path, reverse
 from django import forms
 from django.http import StreamingHttpResponse, FileResponse, HttpResponseRedirect, JsonResponse
-from django.db.models import F, Q, Min, Max, Sum, Value, Count, IntegerField, TextField, CharField, OuterRef, Subquery
+from django.db.models import F, Q, Min, Max, Sum, Value, Count, IntegerField, TextField, CharField, DecimalField, OuterRef, Subquery
 from django.db.models.query import QuerySet
 from django.db import connections
 from django.contrib.auth.forms import ReadOnlyPasswordHashField
@@ -517,9 +517,9 @@ class DocAdmin(CustomModelAdmin):
                     css_media_style = template.extinfo['css_media_style']
                 if not script and 'script' in template.extinfo:
                     script = template.extinfo['script']
-                records = get_model('core.Record').objects.filter(doc=it).select_related('product')
+                records = get_model('core.Record').objects.filter(doc=it).select_related('product')#.annotate(sum=Value(F('count')*F('price'), DecimalField()))
                 content = Template(template.content).render(Context({'doc':it, 'request':request, 'records':records}))
-                docs += f'<p class="page-pad">{content}</p>'
+                docs += content
         if not css_media_style:
             css_media_style = '@media(orientation:portrait) print{html body{width:210mm;height:297mm;visibility:hidden;height:auto;margin:0;padding:0;}} @page{size:A4;margin:0;}'
         docs = f'<div id="section-to-print"><style>{css_media_style}</style>' + re.sub('(<!--.*?-->)', '', docs, flags=re.DOTALL) + f'</div>{script}'

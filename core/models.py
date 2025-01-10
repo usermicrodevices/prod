@@ -130,8 +130,16 @@ class Record(CustomAbstractModel):
         verbose_name_plural = f'®{_("Records")}'
         ordering = ['-id']
 
+    @property
+    def sum_cost(self):
+        return self.count * self.cost
+
+    @property
+    def sum_price(self):
+        return self.count * self.price
+
 @receiver(post_save, sender=Record)
-def on_doc_post_save(sender, **kwargs):
+def on_rec_post_save(sender, **kwargs):
     instance: Record = kwargs['instance']
     recs = Record.objects.filter(doc=instance.doc)
     if not instance.doc.sum_final:
