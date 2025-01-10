@@ -508,7 +508,6 @@ class DocAdmin(CustomModelAdmin):
             if not m:
                 m = it.type._meta
             als = f'{m.app_label}.{m.model_name}.{it.type.alias}'
-            self.logi(als)
             template = templates.get(als)
             if not template:
                 template = get_model('refs.PrintTemplates').objects.filter(alias=als).first()
@@ -518,9 +517,8 @@ class DocAdmin(CustomModelAdmin):
                     css_media_style = template.extinfo['css_media_style']
                 if not script and 'script' in template.extinfo:
                     script = template.extinfo['script']
-                self.logi(template.content)
-                content = Template(template.content).render(Context({'doc':it, 'request':request}))
-                self.logi(content)
+                records = get_model('core.Record').objects.filter(doc=it).select_related('product')
+                content = Template(template.content).render(Context({'doc':it, 'request':request, 'records':records}))
                 docs += f'<p class="page-pad">{content}</p>'
         if not css_media_style:
             css_media_style = '@media(orientation:portrait) print{html body{width:210mm;height:297mm;visibility:hidden;height:auto;margin:0;padding:0;}} @page{size:A4;margin:0;}'
