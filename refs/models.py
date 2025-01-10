@@ -74,6 +74,18 @@ class CustomAbstractModel(models.Model):
             data[f.name] = [i.id for i in f.value_from_object(self)]
         return data
 
+def default_ptmpl_dict():
+    return {'css_media_orientation':'(orientation:portrait)', 'css_media_ext':'html:root{--message-success-bg:unset;} #container{height:max-content;width:max-content;min-width:unset;} ul.messagelist li{display:unset;margin:0;padding:0;background:white;background-size:unset;font-size:unset;word-break:unset;color:black;} header,footer,aside,nav,form,iframe,button,.ad,.success,#header,#content,#toggle-nav-sidebar{display:none;}'}
+
+class PrintTemplates(models.Model):
+    alias = models.CharField(max_length=191, unique=True, null=False, blank=False, default='', verbose_name=_('alias'))
+    content = models.TextField(null=False, blank=False, default='<div id="section-to-print">{{doc.type.name doc.id doc.registered_at}}<script>window.onload=function(){document.getElementsByTagName("head")[0].remove();document.body.style.margin=0;document.body.style.padding=0;document.body.style.width=0;document.body.style.height=0;const parea = document.getElementById("section-to-print");while(document.body.firstChild){document.body.removeChild(document.body.firstChild);}document.body.appendChild(parea);setTimeout(function(){window.print();},0);window.onfocus=function(){setTimeout(function(){window.location.reload();},0);} }</script></div>', verbose_name=_('content'))
+    extinfo = JSONField(default=default_ptmpl_dict, blank=True)
+
+    class Meta:
+        verbose_name = f'🖶{_("Print Template")}'
+        verbose_name_plural = f'🖶{_("Print Templates")}'
+
 
 class Unit(models.Model):
     label = models.CharField(max_length=191, unique=True, null=False, blank=False, default='', verbose_name=_('label of unit'))
@@ -115,7 +127,7 @@ class Currency(models.Model):
 
 
 class Country(models.Model):
-    name = models.CharField(max_length=191, unique=True, null=False, blank=False, default='')
+    name = models.CharField(max_length=191, unique=True, null=False, blank=False, default='', verbose_name=_('name'), help_text=_('name of country'))
 
     def __str__(self):
         return self.name
@@ -127,8 +139,8 @@ class Country(models.Model):
 
 
 class Region(models.Model):
-    name = models.CharField(max_length=191, null=False, blank=False, default='')
-    country = models.ForeignKey(Country, null=False, blank=False, default=1, on_delete=models.CASCADE)
+    name = models.CharField(max_length=191, null=False, blank=False, default='', verbose_name=_('name'), help_text=_('name of region'))
+    country = models.ForeignKey(Country, null=False, blank=False, default=1, on_delete=models.CASCADE, verbose_name=_('country'), help_text=_('country of region'))
 
     def __str__(self):
         return self.name
@@ -141,8 +153,8 @@ class Region(models.Model):
 
 
 class City(models.Model):
-    name = models.CharField(max_length=191, null=False, blank=False, default='')
-    region = models.ForeignKey(Region, null=False, blank=False, default=1, on_delete=models.CASCADE)
+    name = models.CharField(max_length=191, null=False, blank=False, default='', verbose_name=_('name'), help_text=_('name of city'))
+    region = models.ForeignKey(Region, null=False, blank=False, default=1, on_delete=models.CASCADE, verbose_name=_('region'), help_text=_('region of city'))
 
     def __str__(self):
         return self.name
@@ -156,6 +168,7 @@ class City(models.Model):
 
 class Manufacturer(models.Model):
     name = models.CharField(max_length=191, default='', unique=True, verbose_name=_('caption'), help_text=_('Caption of manufacturer'))
+    city = models.ForeignKey(City, default=None, null=True, blank=True, on_delete=models.SET_NULL, verbose_name=_('city'), help_text=_('city of manufacturer'))
 
     def __str__(self):
         return self.name
@@ -168,7 +181,7 @@ class Manufacturer(models.Model):
 
 class ProductModel(models.Model):
     name = models.CharField(max_length=191, default='', unique=True, verbose_name=_('caption'), help_text=_('Caption of model'))
-    manufacturer = models.ForeignKey(Manufacturer, default=None, null=True, blank=True, on_delete=models.PROTECT)
+    manufacturer = models.ForeignKey(Manufacturer, default=None, null=True, blank=True, on_delete=models.PROTECT, verbose_name=_('manufacturer'), help_text=_('manufacturer of model'))
 
     def __str__(self):
         return self.name
@@ -197,9 +210,9 @@ class Company(CustomAbstractModel):
     contact_people = models.CharField(max_length=191, default=None, null=True, blank=True, verbose_name=_('contact people'), help_text=_('Contact people of company'))
     phone = models.CharField(max_length=191, default=None, null=True, blank=True, verbose_name=_('phone'), help_text=_('Contact people phone of company'))
     emails = models.EmailField(max_length=191, default=None, null=True, blank=True, verbose_name=_('email'), help_text=_('Email of company'))
-    city = models.ForeignKey(City, default=None, null=True, blank=True, on_delete=models.SET_NULL)
-    type = models.ForeignKey(CompanyType, default=None, null=True, blank=True, on_delete=models.SET_NULL)
-    currency = models.ForeignKey(Currency, null=True, blank=True, default=1, on_delete=models.SET_NULL)
+    city = models.ForeignKey(City, default=None, null=True, blank=True, on_delete=models.SET_NULL, verbose_name=_('city'), help_text=_('city of company'))
+    type = models.ForeignKey(CompanyType, default=None, null=True, blank=True, on_delete=models.SET_NULL, verbose_name=_('type'), help_text=_('type of company'))
+    currency = models.ForeignKey(Currency, null=True, blank=True, default=1, on_delete=models.SET_NULL, verbose_name=_('currency'), help_text=_('currency of company'))
     extinfo = JSONField(default=dict, blank=True)
 
     class Meta:
