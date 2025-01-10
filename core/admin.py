@@ -14,7 +14,7 @@ from django.utils.safestring import mark_safe
 from django.urls import path, reverse
 from django import forms
 from django.http import StreamingHttpResponse, FileResponse, HttpResponseRedirect, JsonResponse
-from django.db.models import F, Q, Min, Max, Sum, Value, Count, IntegerField, TextField, CharField, OuterRef, Subquery
+from django.db.models import F, Q, Min, Max, Sum, Value, Count, IntegerField, TextField, CharField, DecimalField, OuterRef, Subquery
 from django.db.models.query import QuerySet
 from django.db import connections
 from django.contrib.auth.forms import ReadOnlyPasswordHashField
@@ -28,6 +28,7 @@ from django.views.generic.edit import FormView
 from django.core.cache import caches
 from django.conf import settings
 from django.apps import apps as django_apps
+from django.template import Context, Template
 
 from .models import Doc, Record, Register
 from users.models import User
@@ -336,7 +337,7 @@ class DocAdmin(CustomModelAdmin):
     list_display_links = ('id', 'created_at', 'registered_at')
     search_fields = ('id', 'created_at', 'registered_at', 'owner__name', 'contractor__name', 'type__name', 'tax__name', 'sale_point__name', 'author__username', 'extinfo')
     list_filter = (DocTypeFilter, ContractorCompanyFilter, OwnerCompanyFilter)
-    actions = ('registration','recalculate_final_sum', 'order_to_xls')
+    actions = ('registration','recalculate_final_sum', 'order_to_xls', 'sales_receipt_to_printer')
     fieldsets = [
     (
         None,
@@ -495,5 +496,34 @@ class DocAdmin(CustomModelAdmin):
         self.message_user(request, f'🆗 {_("Finished")} ✏️({fn}); {_("unloaded")} {rcount}', messages.SUCCESS)
         return FileResponse(output, as_attachment=True, filename=fn)
     order_to_xls.short_description = f'⚔📋 {_("order to XLS file")} 📋↘'
+
+    def sales_receipt_to_printer(self, request, queryset):
+        import re
+        docs = ''
+        m = None
+        templates = {}
+        css_media_style = ''
+        script = ''
+        for it in queryset.filter(Q(type__alias='expense') | Q(type__alias='sale')):
+            if not m:
+                m = it.type._meta
+            als = f'{m.app_label}.{m.model_name}.{it.type.alias}'
+            template = templates.get(als)
+            if not template:
+                template = get_model('refs.PrintTemplates').objects.filter(alias=als).first()
+                templates[als] = template
+            if template:
+                if not css_media_style and 'css_media_style' in template.extinfo:
+                    css_media_style = template.extinfo['css_media_style']
+                if not script and 'script' in template.extinfo:
+                    script = template.extinfo['script']
+                records = get_model('core.Record').objects.filter(doc=it).select_related('product')#.annotate(sum=Value(F('count')*F('price'), DecimalField()))
+                content = Template(template.content).render(Context({'doc':it, 'request':request, 'records':records}))
+                docs += content
+        if not css_media_style:
+            css_media_style = '@media(orientation:portrait) print{html body{width:210mm;height:297mm;visibility:hidden;height:auto;margin:0;padding:0;}} @page{size:A4;margin:0;}'
+        docs = f'<div id="section-to-print"><style>{css_media_style}</style>' + re.sub('(<!--.*?-->)', '', docs, flags=re.DOTALL) + f'</div>{script}'
+        self.message_user(request, mark_safe(docs), messages.SUCCESS)
+    sales_receipt_to_printer.short_description = f'🖶 {_("print sales receipt")} 🖶'
 
 admin.site.register(Doc, DocAdmin)

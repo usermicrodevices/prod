@@ -568,3 +568,18 @@ msgstr "выгружено"
 
 msgid "Finished"
 msgstr "Завершено"
+
+msgid "country"
+msgstr "страна"
+
+msgid "region"
+msgstr "регион"
+
+msgid "city"
+msgstr "город"
+
+msgid "currency"
+msgstr "валюта"
+
+msgid "print sales receipt"
+msgstr "печать товарного чека"

@@ -27,7 +27,7 @@ from django.core.cache import caches
 from django.conf import settings
 from django.apps import apps as django_apps
 
-from .models import Unit, Currency, Country, Region, City, Tax, CompanyType, Company, SalePoint, Manufacturer, ProductModel, BarCode, QrCode, DocType, ProductGroup, Product
+from .models import PrintTemplates, Unit, Currency, Country, Region, City, Tax, CompanyType, Company, SalePoint, Manufacturer, ProductModel, BarCode, QrCode, DocType, ProductGroup, Product
 from users.models import User
 
 def get_model(app_model):
@@ -56,6 +56,42 @@ class DropDownFilter(admin.SimpleListFilter):
 class UploadFileForm(forms.Form):
     _selected_action = forms.CharField(widget=forms.MultipleHiddenInput)
     file = forms.FileField(widget=forms.ClearableFileInput(attrs={'allow_multiple_selected': True}))
+
+
+class CountryFilter(DropDownFilter):
+    title = _('Country')
+    parameter_name = 'country'
+
+    def lookups(self, request, model_admin):
+        res = []
+        queryset = Country.objects.only('id', 'name')
+        for it in queryset:
+            res.append((it.id, it.name))
+        return res
+
+    def queryset(self, request, queryset):
+        if not self.value():
+            return queryset
+        else:
+            return queryset.filter(country=self.value())
+
+
+class RegionFilter(DropDownFilter):
+    title = _('Region')
+    parameter_name = 'region'
+
+    def lookups(self, request, model_admin):
+        res = []
+        queryset = Region.objects.only('id', 'name')
+        for it in queryset:
+            res.append((it.id, it.name))
+        return res
+
+    def queryset(self, request, queryset):
+        if not self.value():
+            return queryset
+        else:
+            return queryset.filter(region=self.value())
 
 
 class CityFilter(DropDownFilter):
@@ -422,6 +458,13 @@ class CustomModelAdmin(admin.ModelAdmin):
         return output
 
 
+class PrintTemplatesAdmin(CustomModelAdmin):
+    list_display = ('id', 'alias', 'content', 'extinfo')
+    list_display_links = ('id', 'alias')
+    search_fields = ('id', 'alias', 'content', 'extinfo')
+admin.site.register(PrintTemplates, PrintTemplatesAdmin)
+
+
 class UnitAdmin(CustomModelAdmin):
     list_display = ('id', 'name', 'label')
     list_editable = ('name', 'label')
@@ -444,38 +487,55 @@ admin.site.register(Tax, TaxAdmin)
 
 
 class CountryAdmin(CustomModelAdmin):
-    list_display = ['id', 'name']
+    list_display = ('id', 'name')
     list_display_links = ['name']
-    search_fields = ['name']
+    search_fields = ['id', 'name']
 admin.site.register(Country, CountryAdmin)
 
 
 class RegionAdmin(CustomModelAdmin):
-    list_display = ['id', 'name', 'country']
+    list_display = ('id', 'name', 'country')
     list_display_links = ['name']
-    search_fields = ['name', 'country__name']
+    search_fields = ['id', 'name', 'country__name']
     list_select_related = ['country']
-    list_filter = ['country']
+    list_filter = (CountryFilter,)
     autocomplete_fields = ['country']
     raw_id_fields = ['country']
 admin.site.register(Region, RegionAdmin)
 
 
 class CityAdmin(CustomModelAdmin):
-    list_display = ['id', 'name', 'region']
+    list_display = ('id', 'name', 'region')
     list_display_links = ['id', 'name']
     search_fields = ['id', 'name', 'region__name', 'region__country__name']
     list_select_related = ['region__country']
-    list_filter = ['region__country']
+    list_filter = (CountryFilter, RegionFilter)
     autocomplete_fields = ['region']
     raw_id_fields = ['region']
 admin.site.register(City, CityAdmin)
 
 
 class ManufacturerAdmin(CustomModelAdmin):
-    list_display = ('id', 'name')
+    list_display = ('id', 'name', 'city', 'get_region', 'get_country')
     list_display_links = ('id', 'name')
-    search_fields = ('id', 'name')
+    search_fields = ('id', 'name', 'city__name', 'city__region__name', 'city__region__country__name')
+    list_filter = (CountryFilter, RegionFilter, CityFilter)
+    autocomplete_fields = ['city']
+
+    def get_region(self, obj):
+        try:
+            return obj.city.region.name
+        except:
+            return ''
+    get_region.short_description = _('region')
+
+    def get_country(self, obj):
+        try:
+            return obj.city.region.country.name
+        except:
+            return ''
+    get_country.short_description = _('country')
+
 admin.site.register(Manufacturer, ManufacturerAdmin)
 
 
