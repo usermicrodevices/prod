@@ -10,7 +10,7 @@ cd prod
 mkdir logs media static
 python -m venv venv
 . ./venv/bin/activate
-pip install -r requirements
+pip install -r requirements.txt
 ./manage.py collectstatic
 ./manage.py makemigrations
 ./manage.py migrate
