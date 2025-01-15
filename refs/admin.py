@@ -690,23 +690,25 @@ class ProductAdmin(CustomModelAdmin):
             if obj.id not in self.__objs__:
                 self.__objs__[obj.id] = {}
             try:
-                self.__objs__[obj.id]['lreg'] = get_model('core.Register').objects.filter(rec__product_id=obj.id).order_by('-rec__doc__registered_at').first()
+                self.__objs__[obj.id]['lreg'] = get_model('core.Register').objects.filter(rec__product_id=obj.id).order_by('-rec__doc__registered_at').select_related('rec').first()
             except Exception as e:
                 self.loge(e)
             else:
                 return self.__objs__[obj.id]['lreg']
 
     def get_price_value(self, obj):
-        last_reg = self.get_last_reg(obj)
-        if last_reg:
-            return last_reg.rec.price
+        if settings.BEHAVIOR_PRICE.get('select_from_register', False):
+            last_reg = self.get_last_reg(obj)
+            if last_reg:
+                return last_reg.rec.price
         return obj.price
 
     def get_cost(self, obj):
-        last_reg = self.get_last_reg(obj)
         value = obj.cost
-        if last_reg:
-            value = last_reg.rec.cost
+        if settings.BEHAVIOR_COST.get('select_from_register', False):
+            last_reg = self.get_last_reg(obj)
+            if last_reg:
+                value = last_reg.rec.cost
         return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', value, obj.currency.name if obj.currency else '')
     get_cost.short_description = _('cost')
     get_cost.admin_order_field = 'cost'

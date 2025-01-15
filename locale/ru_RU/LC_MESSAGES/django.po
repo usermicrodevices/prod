@@ -583,3 +583,12 @@ msgstr "валюта"
 
 msgid "print sales receipt"
 msgstr "печать товарного чека"
+
+msgid "new incoming from orders"
+msgstr "новый приход на основе заказов"
+
+msgid "created document"
+msgstr "создан документ"
+
+msgid "count records"
+msgstr "количество позиций"

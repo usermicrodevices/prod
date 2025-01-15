@@ -314,11 +314,23 @@ field_product.on('select2:clear', function(evt) {
 
 class ProductAutocompleteJsonView(CoreBaseAdmin, AutocompleteJsonView):
     def serialize_result(self, obj, to_field_name):
-        return super().serialize_result(obj, to_field_name) | {'cost':obj.cost, 'price':obj.price}
+        cost, price = obj.cost, obj.price
+        last_reg = None
+        if settings.BEHAVIOR_COST.get('select_from_register', False):
+            last_reg = Register.objects.filter(rec__product_id=obj.id).order_by('-rec__doc__registered_at').select_related('rec').first()
+            if last_reg:
+                cost = last_reg.rec.cost
+        if settings.BEHAVIOR_PRICE.get('select_from_register', False):
+            if not last_reg:
+                last_reg = Register.objects.filter(rec__product_id=obj.id).order_by('-rec__doc__registered_at').select_related('rec').first()
+            if last_reg:
+                price = last_reg.rec.price
+        return super().serialize_result(obj, to_field_name) | {'cost':cost, 'price':price}
 
 
 def autocomplete_view(request):
     if request.GET['model_name'] == 'record':
+        print(request.environ.keys())
         return ProductAutocompleteJsonView.as_view(admin_site=admin.site)(request)
     return AutocompleteJsonView.as_view(admin_site=admin.site)(request)
 admin.site.autocomplete_view = autocomplete_view
@@ -337,7 +349,7 @@ class DocAdmin(CustomModelAdmin):
     list_display_links = ('id', 'created_at', 'registered_at')
     search_fields = ('id', 'created_at', 'registered_at', 'owner__name', 'contractor__name', 'type__name', 'tax__name', 'sale_point__name', 'author__username', 'extinfo')
     list_filter = (DocTypeFilter, ContractorCompanyFilter, OwnerCompanyFilter)
-    actions = ('registration','recalculate_final_sum', 'order_to_xls', 'sales_receipt_to_printer')
+    actions = ('new_incoming_from_orders', 'registration', 'unregistration', 'recalculate_final_sum', 'order_to_xls', 'sales_receipt_to_printer')
     fieldsets = [
     (
         None,
@@ -356,6 +368,12 @@ class DocAdmin(CustomModelAdmin):
     class Media:
         #extend = False
         js = (JSProductRelationsSet(),)
+
+    # def formfield_for_dbfield(self, db_field, request, **kwargs):
+    #     if db_field.name == 'type':
+    #         widget = super().formfield_for_dbfield(db_field, request, **kwargs).widget
+    #         return db_field.formfield(widget=widget)
+    #     return super().formfield_for_dbfield(db_field, request, **kwargs)
 
     def save_model(self, request, instance, form, change):
         current_user = request.user
@@ -431,6 +449,15 @@ class DocAdmin(CustomModelAdmin):
         self.message_user(request, f'{_("updated")} {updated_count} ☑', messages.SUCCESS)
     registration.short_description = f'✅ {_("registration for accaunting")} 👌'
 
+    def unregistration(self, request, queryset):
+        updated_count = 0
+        for it in queryset.filter(type_id__in=get_model('refs.DocType').objects.filter(auto_register=True).values('id')):
+            records_queryset = Record.objects.filter(doc=it)
+            if records_queryset.count() == Register.objects.filter(rec__in=records_queryset.values_list('id', flat=True)).delete():
+                updated_count += 1
+        self.message_user(request, f'{_("updated")} {updated_count} ☑', messages.SUCCESS)
+    unregistration.short_description = f'❌ {_("cancel registration")} 👌'
+
     def recalculate_final_sum(self, request, queryset):
         updated_count = 0
         docs = []
@@ -457,7 +484,7 @@ class DocAdmin(CustomModelAdmin):
             self.message_user(request, _('please select items'), messages.ERROR)
             return
 
-        rcount = get_model('core.Record').objects.filter(doc_id__in=queryset.filter(type__alias='order').values('id')).distinct().count()
+        rcount = Record.objects.filter(doc_id__in=queryset.filter(type__alias='order').values('id')).distinct().count()
         if not rcount:
             self.message_user(request, f'🆗 {_("Finished")}. {_("Documents is empy")}.', messages.SUCCESS)
             return
@@ -482,7 +509,7 @@ class DocAdmin(CustomModelAdmin):
             row += 2
             dinfo = f'{d.contractor.name} ([{d.type.name} {d.id}] {d.registered_at.strftime('%Y-%m-%d %H:%M:%S')})'
             worksheet.merge_range(f'A{row}:C{row}', dinfo, cell_format_left_bold)
-            records = get_model('core.Record').objects.filter(doc=d)
+            records = Record.objects.filter(doc=d)
             for r in records:
                 fields = {'product':{'width':50}, 'count':{'width':20}}
                 col = 0
@@ -517,7 +544,7 @@ class DocAdmin(CustomModelAdmin):
                     css_media_style = template.extinfo['css_media_style']
                 if not script and 'script' in template.extinfo:
                     script = template.extinfo['script']
-                records = get_model('core.Record').objects.filter(doc=it).select_related('product')#.annotate(sum=Value(F('count')*F('price'), DecimalField()))
+                records = Record.objects.filter(doc=it).select_related('product')#.annotate(sum=Value(F('count')*F('price'), DecimalField()))
                 content = Template(template.content).render(Context({'doc':it, 'request':request, 'records':records}))
                 docs += content
         if not css_media_style:
@@ -525,5 +552,50 @@ class DocAdmin(CustomModelAdmin):
         docs = f'<div id="section-to-print"><style>{css_media_style}</style>' + re.sub('(<!--.*?-->)', '', docs, flags=re.DOTALL) + f'</div>{script}'
         self.message_user(request, mark_safe(docs), messages.SUCCESS)
     sales_receipt_to_printer.short_description = f'🖶 {_("print sales receipt")} 🖶'
+
+    def new_incoming_from_orders(self, request, queryset):
+        queryset = queryset.filter(type__alias='order')
+        if not queryset.count():
+            self.message_user(request, _('please select items'), messages.ERROR)
+            return
+        records = Record.objects.filter(doc_id__in=queryset.values('id')).distinct()
+        d, count_records = None, 0
+        if records.count():
+            company_owner = request.user.default_company
+            if not company_owner:
+                company_owner = get_model('refs.Company').objects.order_by('id').first()
+            d = Doc(contractor=queryset.first().contractor, owner=company_owner, type=get_model('refs.DocType').objects.filter(alias='receipt').first(), author=request.user)
+            try:
+                d.save()
+            except Exception as e:
+                self.loge(e)
+            else:
+                new_recs = {}
+                for r in records:
+                    if r.product.id not in new_recs:
+                        new_recs[r.product.id] = Record(doc=d, product=r.product, count=r.count, cost=r.product.cost, price=r.product.price)
+                    else:
+                        new_recs[r.product.id].count += r.count
+                try:
+                    objs = Record.objects.bulk_create(new_recs.values())
+                except Exception as e:
+                    self.loge(e)
+                else:
+                    count_records = len(objs)
+                    regs = []
+                    for o in objs:
+                        regs.append(Register(rec=o))
+                        d.sum_final += o.count * o.cost
+                    try:
+                        d.save(update_fields=['sum_final'])
+                    except Exception as e:
+                        self.loge(e)
+                    if regs:
+                        try:
+                            rgs = Register.objects.bulk_create(regs)
+                        except Exception as e:
+                            self.loge(e)
+        self.message_user(request, f'{_("created document")} {d.id if d else 0}; {_("count records")} {count_records}', messages.SUCCESS)
+    new_incoming_from_orders.short_description = f'🪄 {_("new incoming from orders")} ✨'
 
 admin.site.register(Doc, DocAdmin)

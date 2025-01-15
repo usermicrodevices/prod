@@ -185,3 +185,9 @@ window.onfocus=function(){setTimeout(function(){window.location.reload();},0);}
 }
 
 ADMIN_SET_DOCUMENT_RECORD_PRICES = {'check_empty_cost':False, 'check_empty_price':False}
+
+#register_change_referece=false - product reference always stay constant
+#select_from_register=true - select from last register else from reference
+#select_during_... - select value from reference or register when edit document
+BEHAVIOR_COST = {'register_change_referece':True, 'select_from_register':False, 'select_during_incoming':True, 'select_during_sale':False}
+BEHAVIOR_PRICE = {'register_change_referece':True, 'select_from_register':False, 'select_during_incoming':True, 'select_during_sale':True}
