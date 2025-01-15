@@ -81,7 +81,7 @@ class CustomAbstractModel(models.Model):
         return data
 
 
-class Doc(models.Model):
+class Doc(CustomAbstractModel):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name=_('created date'), help_text=_('Date of creation'))
     registered_at = models.DateTimeField(default=django_timezone.now, null=False, blank=False, verbose_name=_('registered date'), help_text=_('Date of registration'))
     owner = models.ForeignKey('refs.Company', default=1, null=False, blank=False, on_delete=models.CASCADE, related_name='owner_docs', related_query_name='owner_doc', verbose_name=_('owner'), help_text=_('owner of document'))
@@ -163,10 +163,28 @@ def on_rec_post_save(sender, **kwargs):
                 instance.loge(e)
 
 
-class Register(models.Model):
+class Register(CustomAbstractModel):
     rec = models.ForeignKey(Record, default=1, null=False, blank=False, on_delete=models.CASCADE, verbose_name=_('record'), help_text=_('record of document'))
 
     class Meta:
         verbose_name = f'✅{_("Register")}'
         verbose_name_plural = f'✅{_("Registers")}'
         ordering = ['-id']
+
+@receiver(post_save, sender=Register)
+def on_reg_post_save(sender, **kwargs):
+    instance: Register = kwargs['instance']
+    updatefields = []
+    if settings.BEHAVIOR_COST.get('register_change_referece', False):
+        if instance.rec.cost != instance.rec.product.cost:
+            instance.rec.product.cost = instance.rec.cost
+            updatefields.append('cost')
+    if settings.BEHAVIOR_PRICE.get('register_change_referece', False):
+        if instance.rec.price != instance.rec.product.price:
+            instance.rec.product.price = instance.rec.price
+            updatefields.append('price')
+    if updatefields:
+        try:
+            instance.rec.product.save(update_fields=updatefields)
+        except Exception as e:
+            instance.loge(e)
