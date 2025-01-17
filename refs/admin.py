@@ -763,13 +763,15 @@ class ProductAdmin(CustomModelAdmin):
         except Exception as e:
             self.loge(e)
         else:
-            self.logi('FROM BASE', self.__objs__[obj.id]['count'])
+            if settings.DEBUG:
+                self.logi('FROM BASE', self.__objs__[obj.id]['count'])
             return self.__objs__[obj.id]['count']
         return 0
 
     def get_count_from_reg(self, obj):
         if obj.id in self.__objs__ and 'count' in self.__objs__[obj.id]:
-            self.logi('FROM BUFFER', self.__objs__[obj.id]['count'])
+            if settings.DEBUG:
+                self.logi('FROM BUFFER', self.__objs__[obj.id]['count'])
             return self.__objs__[obj.id]['count']
         return self.refresh_count_from_reg(obj)
 
