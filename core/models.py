@@ -13,6 +13,7 @@ from django.utils.translation import gettext as _
 from django.core.cache import caches
 from django.db.utils import IntegrityError
 from django.apps import apps as django_apps
+from django.contrib import admin
 try:
     from zoneinfo import available_timezones, ZoneInfo
 except:
@@ -161,6 +162,30 @@ def on_rec_post_save(sender, **kwargs):
                 Register(rec=instance).save()
             except Exception as e:
                 instance.loge(e)
+        last_doc = Doc.objects.filter(id__in=Record.objects.filter(product=instance.product).values('doc_id')).order_by('registered_at').last()
+        if last_doc and last_doc.registered_at <= instance.doc.registered_at:
+            updatefields = []
+            if settings.BEHAVIOR_COST.get('register_change_referece', False):
+                if instance.cost and instance.cost != instance.product.cost:
+                    instance.product.cost = instance.cost
+                    updatefields.append('cost')
+            if settings.BEHAVIOR_PRICE.get('register_change_referece', False):
+                if instance.price and instance.price != instance.product.price:
+                    instance.product.price = instance.price
+                    updatefields.append('price')
+            if updatefields:
+                try:
+                    instance.product.save(update_fields=updatefields)
+                except Exception as e:
+                    instance.loge(e)
+        try:
+            product_admin = admin.site.get_model_admin(get_model('refs.Product'))
+        except Exception as e:
+            instance.loge(e)
+        else:
+            if product_admin and hasattr(product_admin, '__objs__'):
+                if instance.product_id in product_admin.__objs__:
+                    del product_admin.__objs__[instance.product_id]
 
 
 class Register(CustomAbstractModel):
@@ -171,20 +196,21 @@ class Register(CustomAbstractModel):
         verbose_name_plural = f'✅{_("Registers")}'
         ordering = ['-id']
 
+    def reset_admin_product_cache(self):
+        try:
+            product_admin = admin.site.get_model_admin(get_model('refs.Product'))
+        except Exception as e:
+            self.loge(e)
+        else:
+            if product_admin and hasattr(product_admin, '__objs__'):
+                if self.rec.product_id in product_admin.__objs__:
+                    del product_admin.__objs__[self.rec.product_id]
+                self.logi(product_admin.__objs__)
+
 @receiver(post_save, sender=Register)
 def on_reg_post_save(sender, **kwargs):
-    instance: Register = kwargs['instance']
-    updatefields = []
-    if settings.BEHAVIOR_COST.get('register_change_referece', False):
-        if instance.rec.cost != instance.rec.product.cost:
-            instance.rec.product.cost = instance.rec.cost
-            updatefields.append('cost')
-    if settings.BEHAVIOR_PRICE.get('register_change_referece', False):
-        if instance.rec.price != instance.rec.product.price:
-            instance.rec.product.price = instance.rec.price
-            updatefields.append('price')
-    if updatefields:
-        try:
-            instance.rec.product.save(update_fields=updatefields)
-        except Exception as e:
-            instance.loge(e)
+    kwargs['instance'].reset_admin_product_cache()
+
+@receiver(post_delete, sender=Register)
+def on_reg_post_delete(sender, **kwargs):
+    kwargs['instance'].reset_admin_product_cache()

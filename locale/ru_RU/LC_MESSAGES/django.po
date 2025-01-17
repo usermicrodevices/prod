@@ -592,3 +592,9 @@ msgstr "создан документ"
 
 msgid "count records"
 msgstr "количество позиций"
+
+msgid "reset cached values"
+msgstr "сбросить кэшированные значения"
+
+msgid "cancel registration"
+msgstr "отмена регистрации"

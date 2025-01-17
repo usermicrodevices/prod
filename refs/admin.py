@@ -21,6 +21,7 @@ from django.db.models.query import QuerySet
 from django.db import connections
 from django.contrib.admin.models import LogEntry
 from django.contrib.admin.widgets import AutocompleteSelect
+from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
 from django.shortcuts import render
 from django.views.generic.edit import FormView
 from django.core.cache import caches
@@ -678,10 +679,20 @@ class ProductAdmin(CustomModelAdmin):
     list_select_related = ('tax', 'model', 'group')
     list_filter = (ProductGroupFilter, ProductManufacturerFilter, ProductModelFilter, TaxFilter)
     autocomplete_fields = ('tax', 'model', 'group', 'barcodes', 'qrcodes')
-    actions = ('from_xls', 'to_xls', 'price_to_xls', 'barcode_to_svg', 'fix_barcodes')
+    actions = ('from_xls', 'to_xls', 'price_to_xls', 'barcode_to_svg', 'fix_barcodes', 'reset_cached')
 
     #class Media:
         #js = ['admin/js/autocomplete.js', 'admin/js/vendor/select2/select2.full.js']
+
+    def changelist_view(self, request, extra_context=None):
+        if 'action' in request.POST and request.POST['action'] == 'reset_cached':
+            if not request.POST.getlist(ACTION_CHECKBOX_NAME):
+                post = request.POST.copy()
+                p = Product.objects.first()
+                if p:
+                    post.update({ACTION_CHECKBOX_NAME: str(p.id)})
+                request._set_post(post)
+        return super().changelist_view(request, extra_context)
 
     def get_last_reg(self, obj):
         if obj.id in self.__objs__ and 'lreg' in self.__objs__[obj.id]:
@@ -742,21 +753,25 @@ class ProductAdmin(CustomModelAdmin):
             return format_html('<details><summary>{}</summary>{}</details>', idxs[0][1], content)
     get_qrcodes.short_description = _('Qr Codes')
 
+    def refresh_count_from_reg(self, obj):
+        if obj.id not in self.__objs__:
+            self.__objs__[obj.id] = {}
+        SumIncome=Sum('rec__count', filter=Q(rec__doc__type__income=True), default=0)
+        SumExpense=Sum('rec__count', filter=Q(rec__doc__type__income=False), default=0)
+        try:
+            self.__objs__[obj.id]['count'] = get_model('core.Register').objects.filter(rec__product_id=obj.id).aggregate(count=SumIncome-SumExpense)['count']
+        except Exception as e:
+            self.loge(e)
+        else:
+            self.logi('FROM BASE', self.__objs__[obj.id]['count'])
+            return self.__objs__[obj.id]['count']
+        return 0
+
     def get_count_from_reg(self, obj):
         if obj.id in self.__objs__ and 'count' in self.__objs__[obj.id]:
+            self.logi('FROM BUFFER', self.__objs__[obj.id]['count'])
             return self.__objs__[obj.id]['count']
-        else:
-            if obj.id not in self.__objs__:
-                self.__objs__[obj.id] = {}
-            SumIncome=Sum('rec__count', filter=Q(rec__doc__type__income=True), default=0)
-            SumExpense=Sum('rec__count', filter=Q(rec__doc__type__income=False), default=0)
-            try:
-                self.__objs__[obj.id]['count'] = get_model('core.Register').objects.filter(rec__product_id=obj.id).aggregate(count=SumIncome-SumExpense)['count']
-            except Exception as e:
-                self.loge(e)
-            else:
-                return self.__objs__[obj.id]['count']
-        return 0
+        return self.refresh_count_from_reg(obj)
 
     def count(self, obj):
         result = self.get_count_from_reg(obj)
@@ -799,6 +814,10 @@ class ProductAdmin(CustomModelAdmin):
         return format_html('<a href="{}?id={}" target="_blank">{}</a>', reverse(f'admin:{m.app_label}_{m.model_name}_changelist'), o.id, o.name)
     get_group.short_description = _('Product Group')
     get_group.admin_order_field = 'group'
+
+    def reset_cached(self, request, queryset, **kwargs):
+        self.__objs__ = {}
+    reset_cached.short_description = f'↻💦{_("reset cached values")}'
 
     def from_xls(self, request, queryset, **kwargs):
         from barcode import EAN13
@@ -945,7 +964,7 @@ class ProductAdmin(CustomModelAdmin):
         from barcode import EAN13
         from barcode.writer import SVGWriter
         def eval_dim(val, n, m='-'):
-            v = re.findall('\d+\.\d+', val)[0]
+            v = re.findall(r'\d+\.\d+', val)[0]
             suffix = val.replace(v, '')
             return f'{eval(f'{v}{m}{n}')}{suffix}'
         svgs = ''

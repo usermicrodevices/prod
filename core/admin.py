@@ -438,7 +438,7 @@ class DocAdmin(CustomModelAdmin):
             for r in Record.objects.filter(doc=it):
                 if not Register.objects.filter(rec=r).exists():
                     try:
-                        Register(rec=r).save()
+                        obj, created = Register.objects.get_or_create(rec=r)
                     except Exception as e:
                         self.loge(e)
                         break
