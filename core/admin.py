@@ -32,7 +32,7 @@ from django.template import Context, Template
 
 from .models import Doc, Record, Register
 from users.models import User
-from refs.admin import CompanyFilter, DocTypeFilter
+from refs.admin import CompanyFilter, DocTypeFilter, ProductFilter
 
 def get_model(app_model):
     app_name, model_name = app_model.split('.')
@@ -46,6 +46,35 @@ class DropDownFilter(admin.SimpleListFilter):
 class UploadFileForm(forms.Form):
     _selected_action = forms.CharField(widget=forms.MultipleHiddenInput)
     file = forms.FileField(widget=forms.ClearableFileInput(attrs={'allow_multiple_selected': True}))
+
+
+class DocFilter(DropDownFilter):
+    title = _('Document')
+    parameter_name = 'doc'
+
+    def lookups(self, request, model_admin):
+        res = []
+        queryset = Doc.objects.only('id', 'registered_at', 'type').select_related('type')
+        for it in queryset:
+            res.append((it.id, it.registered_at.strftime('%Y-%m-%d %H:%M:%S')+f' {it.type.name}'))
+        return res
+
+    def queryset(self, request, queryset):
+        if not self.value():
+            return queryset
+        else:
+            return queryset.filter(doc=self.value())
+
+
+class DocRecordFilter(DocFilter):
+    title = _('Document')
+    parameter_name = 'rec__doc'
+
+    def queryset(self, request, queryset):
+        if not self.value():
+            return queryset
+        else:
+            return queryset.filter(rec__doc=self.value())
 
 
 class OwnerCompanyFilter(CompanyFilter):
@@ -68,6 +97,28 @@ class ContractorCompanyFilter(CompanyFilter):
             return queryset
         else:
             return queryset.filter(contractor=self.value())
+
+
+class ProductRecordFilter(ProductFilter):
+    title = _('Product')
+    parameter_name = 'rec__product'
+
+    def queryset(self, request, queryset):
+        if not self.value():
+            return queryset
+        else:
+            return queryset.filter(rec__product=self.value())
+
+
+class ProductDocRecFilter(ProductFilter):
+    title = _('Product')
+    parameter_name = 'record__product'
+
+    def queryset(self, request, queryset):
+        if not self.value():
+            return queryset
+        else:
+            return queryset.filter(record__product=self.value())
 
 
 class CoreBaseAdmin():
@@ -236,10 +287,18 @@ admin.site.register(Record, RecordAdmin)
 
 
 class RegisterAdmin(CustomModelAdmin):
-    list_display = ('id', 'rec', 'get_product', 'get_cost', 'get_price', 'get_count', 'get_sum_cost', 'get_sum_price', 'get_doc')
+    list_display = ('id', 'get_rec', 'get_doc', 'get_product', 'get_cost', 'get_price', 'get_count', 'get_sum_cost', 'get_sum_price')
     list_display_links = ('id',)
     search_fields = ('id', 'rec__doc__owner__name', 'rec__doc__contractor__name', 'rec__doc__type__name')
-    list_filter = ('rec__product', 'rec__doc', 'rec__doc__type')
+    list_filter = (ProductRecordFilter, DocRecordFilter, 'rec__doc__type')
+
+    def get_rec(self, obj):
+        return format_html('<a href="{}/core/rec/?id={}" target="_blank">R{}</a>', settings.ADMIN_PATH_PREFIX, obj.rec.id, obj.rec.id)
+    get_rec.short_description = _('record')
+
+    def get_doc(self, obj):
+        return format_html('<a href="{}/core/doc/?id={}" target="_blank">[{}] {} {}</a>', settings.ADMIN_PATH_PREFIX, obj.rec.doc.id, obj.rec.doc.id, obj.rec.doc.type.name, obj.rec.doc.registered_at.strftime('%Y-%m-%d %H:%M'))
+    get_doc.short_description = _('document')
 
     def get_product(self, obj):
         return format_html('<a href="{}/refs/product/?id={}" target="_blank">{}</a>', settings.ADMIN_PATH_PREFIX, obj.rec.product.id, obj.rec.product.name)
@@ -257,10 +316,6 @@ class RegisterAdmin(CustomModelAdmin):
     def get_price(self, obj):
         return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', obj.rec.price.quantize(Decimal('0.00')), obj.rec.currency.name if obj.rec.currency else '')
     get_price.short_description = _('price')
-
-    def get_doc(self, obj):
-        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{}</font>', obj.rec.doc)
-    get_doc.short_description = _('document')
 
     def get_sum_cost(self, obj):
         return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', (obj.rec.cost*obj.rec.count).quantize(Decimal('0.00')), obj.rec.currency.name if obj.rec.currency else '')
@@ -348,7 +403,7 @@ class DocAdmin(CustomModelAdmin):
     list_display = ('id', 'get_reg', 'created_at', 'registered_at', 'type', 'contractor', 'get_records', 'get_sum_cost', 'get_sum_price', 'sum_final', 'tax', 'owner', 'author', 'extinfo')
     list_display_links = ('id', 'created_at', 'registered_at')
     search_fields = ('id', 'created_at', 'registered_at', 'owner__name', 'contractor__name', 'type__name', 'tax__name', 'sale_point__name', 'author__username', 'extinfo')
-    list_filter = (DocTypeFilter, ContractorCompanyFilter, OwnerCompanyFilter)
+    list_filter = (DocTypeFilter, ContractorCompanyFilter, OwnerCompanyFilter, ProductDocRecFilter)
     actions = ('new_incoming_from_orders', 'registration', 'unregistration', 'recalculate_final_sum', 'order_to_xls', 'sales_receipt_to_printer')
     fieldsets = [
     (

@@ -84,7 +84,7 @@ class RoleModel(models.Model, BaseModelWithLogger):
         verbose_name_plural = f'🤵{_("Role Models")}'
 
     def __str__(self):
-        return '​✅{} [{}] ({})'.format(self.id, self.value, self.description)
+        return f'​✅[{self.id}] {self.app}.{self.model} '
 
 
 class Role(models.Model, BaseModelWithLogger):
