@@ -248,7 +248,7 @@ class CustomModelAdmin(CoreBaseAdmin, admin.ModelAdmin):
 
 
 class RecordAdmin(CustomModelAdmin):
-    list_display = ('id', 'get_doc', 'get_product', 'get_cost', 'get_price', 'get_count', 'get_sum_cost', 'get_sum_price', 'extinfo')
+    list_display = ('id', 'get_doc', 'product', 'get_cost', 'get_price', 'get_count', 'get_sum_cost', 'get_sum_price', 'extinfo')
     list_display_links = ('id',)
     search_fields = ('id', 'doc__owner__name', 'doc__contractor__name', 'doc__type__name', 'doc__tax__name', 'doc__sale_point__name', 'doc__author__username', 'extinfo')
     list_select_related = ('product', 'doc')
@@ -260,9 +260,9 @@ class RecordAdmin(CustomModelAdmin):
         return format_html('<a href="{}/core/doc/?id={}" target="_blank">[{}] {} {}</a>', settings.ADMIN_PATH_PREFIX, obj.doc.id, obj.doc.id, obj.doc.type.name, obj.doc.registered_at.strftime('%Y-%m-%d %H:%M'))
     get_doc.short_description = _('document')
 
-    def get_product(self, obj):
+    def product(self, obj):
         return format_html('<a href="{}/refs/product/?id={}" target="_blank">{}</a>', settings.ADMIN_PATH_PREFIX, obj.product.id, obj.product.name)
-    get_product.short_description = _('product')
+    product.short_description = _('product')
 
     def get_count(self, obj):
         color = 'green' if obj.doc.type.income==True else 'red'
@@ -292,16 +292,16 @@ admin.site.register(Record, RecordAdmin)
 
 
 class RegisterAdmin(CustomModelAdmin):
-    list_display = ('id', 'get_rec', 'get_doc', 'get_product', 'get_cost', 'get_price', 'get_count', 'get_sum_cost', 'get_sum_price')
+    list_display = ('id', 'rec', 'get_doc', 'get_product', 'get_cost', 'get_price', 'get_count', 'get_sum_cost', 'get_sum_price')
     list_display_links = ('id',)
     search_fields = ('id', 'rec__doc__owner__name', 'rec__doc__contractor__name', 'rec__doc__type__name')
     list_filter = (ProductRecordFilter, DocRecordFilter, 'rec__doc__type')
     list_editable = ['rec']
     autocomplete_fields = ['rec']
 
-    def get_rec(self, obj):
+    def rec(self, obj):
         return format_html('<a href="{}/core/record/?id={}" target="_blank">R{}</a>', settings.ADMIN_PATH_PREFIX, obj.rec.id, obj.rec.id)
-    get_rec.short_description = _('record')
+    rec.short_description = _('record')
 
     def get_doc(self, obj):
         return format_html('<a href="{}/core/doc/?id={}" target="_blank">[{}] {} {}</a>', settings.ADMIN_PATH_PREFIX, obj.rec.doc.id, obj.rec.doc.id, obj.rec.doc.type.name, obj.rec.doc.registered_at.strftime('%Y-%m-%d %H:%M'))
