@@ -22,3 +22,9 @@ pip install -r requirements.txt
 ./manage.py runserver
 ```
 and go to your browser http://127.0.0.1:8000/admin
+
+# run with daphne
+```
+daphne -e ssl:interface=127.0.0.1:9443:privateKey=ssl-cert-snakeoil.key:certKey=ssl-cert-snakeoil.pem shop.asgi:application
+```
+and go to your browser https://127.0.0.1:9443/admin
