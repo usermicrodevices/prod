@@ -1,7 +1,8 @@
-import logging, sys
+import logging, sys, time
 from uuid import uuid4
 from itertools import chain
 from datetime import datetime, timedelta, timezone
+from barcode import EAN13
 
 from django.conf import settings
 from django.db import models, transaction
@@ -16,6 +17,15 @@ try:
     from zoneinfo import available_timezones, ZoneInfo
 except:
     from backports.zoneinfo import available_timezones, ZoneInfo
+
+
+def ean13(value:str=None):
+    if not value:
+        value = f'{round(time.time()*1000)}'
+    ean13 = EAN13(value)
+    if value != ean13.ean:
+        value = ean13.ean
+    return value
 
 
 class CustomAbstractModel(models.Model):
@@ -247,7 +257,7 @@ class SalePoint(models.Model):
 
 
 class BarCode(models.Model):
-    id = models.CharField(primary_key=True, max_length=191, unique=True, default=uuid4, null=False, blank=False, verbose_name=_('value'), help_text=_('product barcode'))
+    id = models.CharField(primary_key=True, max_length=191, unique=True, default=ean13, null=False, blank=False, verbose_name=_('value'), help_text=_('product barcode'))
 
     class Meta:
         verbose_name = f'Ⅲ{_("Bar Code")}'

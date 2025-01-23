@@ -651,16 +651,16 @@ class BarCodeAdmin(CustomModelAdmin):
     get_products.short_description = _('Products')
 
     def fix_code(self, request, queryset):
-        from barcode import EAN13
+        from .models import ean13
         replaced = 0
         for bcode in queryset:
-            ean13 = EAN13(bcode.id)
-            if bcode.id != ean13.ean:
+            e13 = ean13(bcode.id)
+            if bcode.id != e13:
                 products = []
                 for p in Product.objects.filter(barcodes__id=bcode.id):
                     products.append(p)
                     p.barcodes.remove(bcode)
-                bcode.id = ean13.ean
+                bcode.id = e13
                 try:
                     bcode.save()
                 except Exception as e:
@@ -1032,21 +1032,21 @@ class ProductAdmin(CustomModelAdmin):
     barcode_to_svg.short_description = f'🖶{_("print barcode as SVG")}🖼'
 
     def fix_barcodes(self, request, queryset):
-        from barcode import EAN13
+        from .models import ean13
         msg = ''
         delete_bcodes = []
         fixcount = 0
         for it in queryset:
             for bcode in it.barcodes.all():
-                b = EAN13(bcode.id)
-                if b.ean != bcode.id:
+                e13 = ean13(bcode.id)
+                if e13 != bcode.id:
                     if settings.DEBUG:
                         self.logw('INVALID', bcode.id)
                     it.barcodes.remove(bcode)
                     delete_bcodes.append(bcode.id)
-                    if BarCode.objects.filter(id=b.ean).exists():
-                        b = EAN13(f'{round(time.time()*1000)}')
-                    bcode = BarCode(b.ean)
+                    if BarCode.objects.filter(id=e13).exists():
+                        e13 = ean13(f'{round(time.time()*1000)}')
+                    bcode = BarCode(e13)
                     try:
                        bcode.save()
                     except Exception as e:
