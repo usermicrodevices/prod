@@ -338,6 +338,24 @@ class ProductManufacturerFilter(DropDownFilter):
             return queryset.filter(model__manufacturer=self.value())
 
 
+class ProductFilter(DropDownFilter):
+    title = _('Product')
+    parameter_name = 'product'
+
+    def lookups(self, request, model_admin):
+        res = []
+        queryset = Product.objects.only('id', 'name')
+        for it in queryset:
+            res.append((it.id, it.name))
+        return res
+
+    def queryset(self, request, queryset):
+        if not self.value():
+            return queryset
+        else:
+            return queryset.filter(product=self.value())
+
+
 class DocTypeFilter(DropDownFilter):
     title = _('Doc Type')
     parameter_name = 'type'

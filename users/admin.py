@@ -25,12 +25,18 @@ from .models import get_users_by_owner, Role, RoleModel, RoleField, User
 admin.site.subtitle = _('Users')
 
 def get_model(app_model):
-	app_name, model_name = app_model.split('.')
-	return django_apps.get_app_config(app_name).get_model(model_name)
+    app_name, model_name = app_model.split('.')
+    return django_apps.get_app_config(app_name).get_model(model_name)
 
 class UploadFileForm(forms.Form):
     _selected_action = forms.CharField(widget=forms.MultipleHiddenInput)
     file = forms.FileField(widget=forms.ClearableFileInput(attrs={'allow_multiple_selected': True}))
+
+
+class LogEntryAdmin(admin.ModelAdmin):
+    list_display = ('id', 'action_time', 'user', 'content_type', 'object_repr', 'action_flag', 'change_message')
+    search_fields = ('id', 'action_time', 'user__username', 'user__first_name', 'user__last_name', 'user__email', 'object_repr', 'change_message')
+admin.site.register(admin.models.LogEntry, LogEntryAdmin)
 
 
 class ContentTypeAdmin(admin.ModelAdmin):

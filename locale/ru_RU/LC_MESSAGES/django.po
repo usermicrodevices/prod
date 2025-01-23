@@ -598,3 +598,9 @@ msgstr "сбросить кэшированные значения"
 
 msgid "cancel registration"
 msgstr "отмена регистрации"
+
+msgid "References"
+msgstr "Справочники"
+
+msgid "Core"
+msgstr "Главное"
