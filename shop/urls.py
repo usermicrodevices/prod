@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from django.contrib import admin
 from django.conf import settings
 from django.http import HttpResponse
@@ -9,7 +9,9 @@ def favicon(request):
     return HttpResponse(settings.FAVICON_BASE64, content_type='image/svg+xml')
 
 urlpatterns = [
+    path('api/', include('api.urls')),
     path('admin/', admin.site.urls),
+    #path("accounts/", include("django.contrib.auth.urls")),
     path('favicon.ico', favicon)
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 

@@ -7,6 +7,12 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '192.168.0.1']
 
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+
+CSRF_COOKIE_DOMAIN = '127.0.0.1'
+CSRF_TRUSTED_ORIGINS = ['http://127.0.0.1', 'http://127.0.0.1:8000', 'https://127.0.0.1:9443']
+CORS_ALLOWED_ORIGINS = ['http://127.0.0.1', 'http://127.0.0.1:8000', 'https://127.0.0.1:9443']
+
 INSTALLED_APPS = [
     "daphne",
     'django.contrib.admin',
@@ -17,7 +23,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'users.apps.UsersConfig',
     'refs.apps.RefsConfig',
-    'core.apps.CoreConfig'
+    'core.apps.CoreConfig',
+    'api.apps.ApiConfig'
 ]
 
 MIDDLEWARE = [
@@ -26,6 +33,8 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    "django.contrib.auth.middleware.LoginRequiredMiddleware",
+    "django.contrib.auth.middleware.PersistentRemoteUserMiddleware",
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django.middleware.locale.LocaleMiddleware'
@@ -152,8 +161,6 @@ LOGGING = {
         }
     }
 }
-
-X_FRAME_OPTIONS = 'SAMEORIGIN'
 
 ADMIN_MAIN_MENU_FIRST_ITEMS = ['core', 'refs', 'users']
 

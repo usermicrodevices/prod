@@ -19,6 +19,8 @@ from django.http import StreamingHttpResponse, FileResponse
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.sessions.models import Session
+#from django.contrib.sessions.backends.db import SessionStore
 
 from .models import get_users_by_owner, Role, RoleModel, RoleField, User
 
@@ -31,6 +33,17 @@ def get_model(app_model):
 class UploadFileForm(forms.Form):
     _selected_action = forms.CharField(widget=forms.MultipleHiddenInput)
     file = forms.FileField(widget=forms.ClearableFileInput(attrs={'allow_multiple_selected': True}))
+
+
+class SessionAdmin(admin.ModelAdmin):
+    _session_store_ = Session.get_session_store_class()()
+    list_display = ('expire_date', 'session_key', 'get_session_data')
+    search_fields = ('expire_date', 'session_key', 'session_data')
+
+    def get_session_data(self, obj):
+        return self._session_store_.decode(obj.session_data) if obj.session_data else ''
+    get_session_data.admin_order_field = 'session_data'
+admin.site.register(Session, SessionAdmin)
 
 
 class LogEntryAdmin(admin.ModelAdmin):
