@@ -344,7 +344,7 @@ class JSProductRelationsSet:
         set_price_code = 'elem_price.val(evt.params.data.price);'
         if settings.ADMIN_SET_DOCUMENT_RECORD_PRICES.get('check_empty_price', False):
             set_price_code = f'if(!elem_price.val() || elem_price.val()==0) {set_price_code}'
-        return '''<script>'use strict';
+        return r'''<script>'use strict';
 window.onload = (event) => {
 const $ = django.jQuery;
 const field_product = $('div[data-model-ref="product"]');
@@ -353,8 +353,9 @@ field_product.on('select2:close', function(evt) {
 });
 field_product.on('select2:select', function(evt) {
     if(evt.params.data){
-        const row_id = evt.target.id.match(/\d+/)[0];
-        $('#id_record_set-'+row_id+'-count').val(function(i, oldval){return parseFloat(oldval)+1;});
+        const row_id = evt.target.id.replace(/\D/g, "");
+        const elem_count = $('#id_record_set-'+row_id+'-count');
+        elem_count.val(function(i, oldval){return parseFloat(oldval)+1;});
         if("cost" in evt.params.data){
             const elem_cost = $('#id_record_set-'+row_id+'-cost');
             ''' + set_cost_code + '''
@@ -363,10 +364,43 @@ field_product.on('select2:select', function(evt) {
             const elem_price = $('#id_record_set-'+row_id+'-price');
             ''' + set_price_code + '''
         }
+        const elem_product = $('#record_set-'+row_id).find('.field-product');
+        if(elem_product.length){
+            const div_product = elem_product.find('div');
+            if("count" in evt.params.data){
+                elem_count.attr('title', 'remaining count = '+evt.params.data.count);
+                const elem_remaining_count = elem_product.find('#remaining-count-'+row_id);
+                if(elem_remaining_count.length){
+                    elem_remaining_count.html(evt.params.data.count);
+                } else {
+                    const new_elem_remaining_count = $('<span id="remaining-count-'+row_id+'">'+evt.params.data.count+'</span>');
+                    if(div_product.length){
+                        div_product.css('margin-bottom','0');
+                        div_product.append(new_elem_remaining_count);
+                    } else {
+                        elem_product.append(new_elem_remaining_count);
+                    }
+                }
+            }
+            if("unit" in evt.params.data){
+                const elem_product_unit = elem_product.find('#product-unit-'+row_id);
+                if(elem_product_unit.length){
+                    elem_product_unit.html(evt.params.data.unit);
+                } else {
+                    const new_elem_product_unit = $('<span id="product-unit-'+row_id+'">'+evt.params.data.unit+'</span>');
+                    if(div_product.length){
+                        div_product.append(new_elem_product_unit);
+                    } else {
+                        elem_product.append(new_elem_product_unit);
+                    }
+                }
+            }
+        }
+        ''' + settings.BEHAVIOR_COUNT.get('select_focus', '') + r'''
     }
 });
 field_product.on('select2:clear', function(evt) {
-    const row_id = evt.target.id.match(/\d+/)[0]
+    const row_id = evt.target.id.replace(/\D/g, "");
     $('#id_record_set-'+row_id+'-count').val();
     $('#id_record_set-'+row_id+'-cost').val();
     $('#id_record_set-'+row_id+'-price').val();
@@ -376,23 +410,39 @@ field_product.on('select2:clear', function(evt) {
 
 class ProductAutocompleteJsonView(CoreBaseAdmin, AutocompleteJsonView):
     def serialize_result(self, obj, to_field_name):
-        cost, price = obj.cost, obj.price
+        ext_data = {}
         last_reg = None
         if settings.BEHAVIOR_COST.get('select_from_register', False):
             last_reg = Register.objects.filter(rec__product_id=obj.id).order_by('-rec__doc__registered_at').select_related('rec').first()
             if last_reg:
-                cost = last_reg.rec.cost
+                ext_data['cost'] = last_reg.rec.cost
+        elif obj.cost:
+            ext_data['cost'] = obj.cost
         if settings.BEHAVIOR_PRICE.get('select_from_register', False):
             if not last_reg:
                 last_reg = Register.objects.filter(rec__product_id=obj.id).order_by('-rec__doc__registered_at').select_related('rec').first()
             if last_reg:
-                price = last_reg.rec.price
-        return super().serialize_result(obj, to_field_name) | {'cost':cost, 'price':price}
+                ext_data['price'] = last_reg.rec.price
+        elif obj.price:
+            ext_data['price'] = obj.price
+        if settings.BEHAVIOR_COUNT.get('select_from_register', False):
+            SumIncome=Sum('rec__count', filter=Q(rec__doc__type__income=True), default=0)
+            SumExpense=Sum('rec__count', filter=Q(rec__doc__type__income=False), default=0)
+            try:
+                ext_data['count'] = get_model('core.Register').objects.filter(rec__product_id=obj.id).aggregate(count=SumIncome-SumExpense)['count']
+            except Exception as e:
+                self.loge(e)
+        if obj.unit:
+            ext_data['unit'] = obj.unit.label
+        result = super().serialize_result(obj, to_field_name)
+        if ext_data:
+            result |= ext_data
+        return result
 
 
 def autocomplete_view(request):
     if request.GET['model_name'] == 'record':
-        print(request.environ.keys())
+        #print(request.environ.keys())
         return ProductAutocompleteJsonView.as_view(admin_site=admin.site)(request)
     return AutocompleteJsonView.as_view(admin_site=admin.site)(request)
 admin.site.autocomplete_view = autocomplete_view

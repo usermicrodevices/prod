@@ -204,3 +204,4 @@ ADMIN_SET_DOCUMENT_RECORD_PRICES = {'check_empty_cost':False, 'check_empty_price
 #select_during_... - select value from reference or register when edit document
 BEHAVIOR_COST = {'register_change_referece':True, 'select_from_register':False, 'select_during_incoming':True, 'select_during_sale':False}
 BEHAVIOR_PRICE = {'register_change_referece':True, 'select_from_register':False, 'select_during_incoming':True, 'select_during_sale':True}
+BEHAVIOR_COUNT = {'select_from_register':True, 'select_during_incoming':True, 'select_during_sale':True, 'select_focus':'elem_count.focus();'}
