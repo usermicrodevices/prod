@@ -1011,6 +1011,7 @@ class ProductAdmin(CustomModelAdmin):
         svg_width = '30mm'
         svg_height = '20mm'
         font_size = settings.ADMIN_EAN13_RENDER_OPTIONS.get('font_size', 8)
+        font_style_ext = settings.ADMIN_EAN13_RENDER_OPTIONS.get('font_style_ext', '')
         text_wrapped_symbols = settings.ADMIN_EAN13_RENDER_OPTIONS.get('text_wrapped_symbols', 15)
         show_name = settings.ADMIN_EAN13_RENDER_OPTIONS.get('show_name', False)
         name_at_top = settings.ADMIN_EAN13_RENDER_OPTIONS.get('name_at_top', False)
@@ -1043,7 +1044,7 @@ class ProductAdmin(CustomModelAdmin):
                         else:
                             name_at_top_x = '0mm'
                     name_wrapped = f'</tspan><tspan x="{name_at_top_x}" dy="{name_at_top_h}pt">'.join(wrap(it.name, text_wrapped_symbols)).join([f'<tspan x="{name_at_top_x}" dy="{name_at_top_h}pt">','</tspan>'])
-                    svg_top = f'<svg id="top" xmlns="http://www.w3.org/2000/svg" width="{eval_dim(svg_width,.5)}" height="{eval_dim(svg_height,1.911)}"><g id="top-g"><text id="top-text" x="{name_at_top_x}mm" style="font-size:{font_size}pt;text-anchor:middle;">{name_wrapped}</text></g>'
+                    svg_top = f'<svg id="top" xmlns="http://www.w3.org/2000/svg" width="{eval_dim(svg_width,.5)}" height="{eval_dim(svg_height,1.911)}"><g id="top-g"><text id="top-text" x="{name_at_top_x}mm" style="font-size:{font_size}pt;text-anchor:middle;{font_style_ext}">{name_wrapped}</text></g>'
                     svgs += f'<p class="page-pad">{svg_top}{svg.replace('<svg', f'<svg y="{name_at_top_h}mm"')}</svg></p>'
                 else:
                     svgs += f'<p class="page-pad">{svg}</p>'
