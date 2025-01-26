@@ -171,6 +171,7 @@ ADMIN_EAN13_RENDER_OPTIONS = {
 'module_height':6.0,
 'quiet_zone':0.5,
 'font_size':8,
+'font_style_ext':'font-weight:bold;',
 'text_distance':2.5,
 'show_name':False,
 'name_at_top':True,
