@@ -289,9 +289,11 @@ class DocType(models.Model):
 
 
 class ProductGroup(models.Model):
+    parent = models.ForeignKey('self', default=None, null=True, blank=True, on_delete=models.CASCADE)
     name = models.CharField(max_length=191, unique=True, default=_('Products'), verbose_name=_('name'), help_text=_('name of products group'))
     alias = models.CharField(max_length=191, default=None, null=True, blank=True, verbose_name=_('alias'), help_text=_('alias of products group'))
     description = models.CharField(max_length=191, default=None, null=True, blank=True, verbose_name=_('description'), help_text=_('description of products group'))
+    extinfo = JSONField(default=dict, blank=True)
 
     def __str__(self):
         return self.name

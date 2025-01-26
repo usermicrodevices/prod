@@ -683,9 +683,10 @@ admin.site.register(QrCode, QrCodeAdmin)
 
 
 class ProductGroupAdmin(CustomModelAdmin):
-    list_display = ('id', 'name', 'alias', 'description')
+    list_display = ('id', 'name', 'parent', 'alias', 'description', 'extinfo')
     list_display_links = ('id', 'name', 'alias')
-    search_fields = ('id', 'name', 'alias', 'description')
+    search_fields = ('id', 'name', 'alias', 'description', 'extinfo')
+    list_filter = ('parent',)
 admin.site.register(ProductGroup, ProductGroupAdmin)
 
 
@@ -793,10 +794,29 @@ class ProductAdmin(CustomModelAdmin):
             return self.__objs__[obj.id]['count']
         return self.refresh_count_from_reg(obj)
 
+    def get_min_styles_reversed(self, grp, min_styles = {}):
+        min_styles = grp.extinfo.get('min_styles', {})
+        if grp.parent:
+            min_styles |= self.get_min_styles_reversed(grp.parent, min_styles)
+        return min_styles
+
+    def get_min_styles(self, grp, min_styles = {}):
+        if grp.parent:
+            min_styles |= self.get_min_styles(grp.parent, min_styles)
+        return min_styles | grp.extinfo.get('min_styles', {})
+
     def count(self, obj):
-        result = self.get_count_from_reg(obj)
-        color = 'green' if result > 0 else 'red'
-        return format_html('<p><a href="{}/core/register/?rec__product={}" target="_blank" style="color:{}">{}</a></p>', settings.ADMIN_PATH_PREFIX, obj.id, color, result)
+        cnt = self.get_count_from_reg(obj)
+        color = 'color:green;' if cnt > 0 else 'color:red;'
+        if obj.group:
+            min_styles = self.get_min_styles(obj.group)
+            if min_styles:
+                #for k in sorted(min_styles.keys(), reverse=True):
+                for k in min_styles.keys():
+                    if cnt <= int(k):
+                        color = min_styles[k]
+                        break
+        return format_html('<p><a href="{}/core/register/?rec__product={}" target="_blank" style="{}">{}</a></p>', settings.ADMIN_PATH_PREFIX, obj.id, color, cnt)
     count.short_description = _('Count')
 
     def get_sum(self, obj):
