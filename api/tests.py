@@ -38,7 +38,7 @@ class Usr(TransactionTestCase):
         self.client = Client()
         url = '/admin/login/'
         print('⚽GET', url)
-        response = self.client.post(url, {'username':self.user.username, 'password':self.test_password}, 'json')
+        response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         print(self.client.cookies)
         parser = CSRFParser()
@@ -55,10 +55,10 @@ class Usr(TransactionTestCase):
         print()
         url = '/api/login/'
         data = json.dumps({'username':self.user.username, 'password':self.test_password})
-        print('⚽GET', url, data)# headers={"host": "127.0.0.1:8000"}
-        print(self.client.cookies)
+        print('⚽POST', url, data)# headers={"host": "127.0.0.1:8000"}
         response = self.client.post(url, data, 'json', headers={'X-CSRFToken':self.csrfmiddlewaretoken})
         self.assertEqual(response.status_code, 200)
+        print(self.client.cookies)
         print('Request♥', response.request)
         print('Response♡', json.dumps(response.json(), ensure_ascii=False).encode('utf-8'))
         print(response.content)
@@ -71,4 +71,12 @@ class Usr(TransactionTestCase):
         self.assertEqual(response.status_code, 200)
         print('Request♥', response.request)
         print('Response♡', response, response.headers)
-        print('DATA⋆', response.content)
+        print('DATA⋆', eval(json.loads(response.content)))
+        print()
+        url = '/api/products/cash/'
+        print('⚽GET', url)
+        response = self.client.get(url, headers={'X-CSRFToken':self.csrfmiddlewaretoken})
+        self.assertEqual(response.status_code, 200)
+        print('Request♥', response.request)
+        print('Response♡', response, response.headers)
+        print('DATA⋆', eval(json.loads(response.content)))

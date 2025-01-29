@@ -3,6 +3,7 @@ import json, logging
 from django.http import JsonResponse
 from django.views import View
 from django.core.serializers import serialize#, JSONSerializer
+from django.core.serializers.json import DjangoJSONEncoder
 #from django.core.signing import Signer
 from django.contrib.auth import SESSION_KEY, BACKEND_SESSION_KEY, HASH_SESSION_KEY, authenticate, login
 from django.contrib.auth.decorators import login_required, login_not_required
@@ -10,6 +11,7 @@ from django.views.decorators.csrf import csrf_exempt, csrf_protect, requires_csr
 from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
+from django.db.models import F
 
 from users.models import User
 from refs.models import Product
@@ -67,13 +69,29 @@ def url_logout(request):
 
 
 #import asyncio
-class ProductView(View):
+class ProductsView(View):
     queryset = Product.objects.all()
 
-    #@method_decorator([login_required, csrf_protect, requires_csrf_token, ensure_csrf_cookie], name='dispatch')
+    #@method_decorator([login_required, csrf_protect, requires_csrf_token, ensure_csrf_cookie])
     #async def get(self, request, *args, **kwargs):
-    @method_decorator([ensure_csrf_cookie], name='dispatch')
+    @method_decorator([ensure_csrf_cookie])
     def get(self, request, *args, **kwargs):
         #await asyncio.sleep(1)
-        data = serialize('json', self.queryset, fields=('id', 'name', 'cost', 'price'))
+        data = serialize('json', self.queryset, fields=('id', 'article', 'name', 'cost', 'price', 'barcodes', 'currency'))
         return JsonResponse(data, safe=False)
+
+
+class ProductsCashView(ProductsView):
+
+    @method_decorator([ensure_csrf_cookie])
+    def get(self, request, *args, **kwargs):
+        #def dflt(item):
+            #return False if item[0] == 'id' else True
+        #qs = self.queryset.annotate(curr=F('currency__name')).prefetch_related('currency', 'barcodes').values('id', 'article', 'name', 'price', 'barcodes', 'curr')
+        #json_data = json.dumps(list(qs), cls=DjangoJSONEncoder)
+        #data = {it['id']:dict(filter(dflt, it.items())) for it in qs}
+        data = {}
+        for it in self.queryset.prefetch_related('currency', 'barcodes'):
+            data[it.id] = {'article':it.article, 'name':it.name, 'price':it.price, 'barcodes':list(it.barcodes.values_list('id', flat=True)), 'currency':it.currency.name}
+        json_data = json.dumps(data, cls=DjangoJSONEncoder)
+        return JsonResponse(json_data, safe=False)
