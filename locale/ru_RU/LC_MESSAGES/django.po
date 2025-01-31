@@ -506,6 +506,9 @@ msgstr "Пользователи"
 msgid "load from XLS file"
 msgstr "загрузить из файла XLS"
 
+msgid "load from XLS file with check (slow)"
+msgstr "загрузить из файла XLS с проверкой (медленно)"
+
 msgid "export to XLS file"
 msgstr "экспорт в файл XLS"
 
