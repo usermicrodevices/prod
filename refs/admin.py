@@ -698,7 +698,7 @@ class ProductAdmin(CustomModelAdmin):
     list_select_related = ('tax', 'model', 'group')
     list_filter = (ProductGroupFilter, ProductManufacturerFilter, ProductModelFilter, TaxFilter)
     autocomplete_fields = ('tax', 'model', 'group', 'barcodes', 'qrcodes')
-    actions = ('from_xls', 'to_xls', 'price_to_xls', 'barcode_to_svg', 'fix_barcodes', 'reset_cached')
+    actions = ('from_xls_with_check', 'from_xls', 'to_xls', 'price_to_xls', 'barcode_to_svg', 'fix_barcodes', 'reset_cached')
 
     #class Media:
         #js = ['admin/js/autocomplete.js', 'admin/js/vendor/select2/select2.full.js']
@@ -858,6 +858,122 @@ class ProductAdmin(CustomModelAdmin):
     def reset_cached(self, request, queryset, **kwargs):
         self.__objs__ = {}
     reset_cached.short_description = f'↻💦{_("reset cached values")}'
+
+    def from_xls_with_check(self, request, queryset, **kwargs):
+        from barcode import EAN13
+        from transliterate import slugify
+        from openpyxl import load_workbook
+        form = None
+        if 'apply' in request.POST:
+            self.logi('💡', request.FILES)
+            form = UploadFileForm(request.POST, request.FILES)
+            if form.is_valid():
+                msg_err = ''
+                count_created = 0
+                file = form.cleaned_data['file']
+                if file:
+                    units, groups, doc_income = {}, {}, None
+                    timestamp = int(time.time())
+                    wb = load_workbook(file)
+                    for sheetname in wb.sheetnames:
+                        self.logi('💡SHEET NAME', sheetname)
+                        ws = wb[sheetname]
+                        list_rows = list(ws.rows)
+                        prefix_cells = list_rows[0]
+                        self.logi(prefix_cells)
+                        row_index = 0
+                        for row in list_rows[1:]:
+                            if msg_err and msg_err[-1] != '\n':
+                                msg_err += '\n'
+                            row_index += 1
+                            v = list(row)
+                            try:
+                                p_group, p_code, p_name, p_article, p_unit, p_price, p_cost, p_barcode, p_count = [i.value for i in v]
+                            except Exception as e:
+                                self.loge(e)
+                                msg_err += f'ROW {row_index}: {e}'
+                            else:
+                                if Product.objects.filter(article=p_article).exists():
+                                    self.logi('PRODUCT', p_article, p_name, 'EXISTS')
+                                else:
+                                    product_kwargs = {'article':p_article if p_article else f'{timestamp+row_index}', 'name':p_name, 'cost':p_cost if isinstance(p_cost, (int, float)) else 0, 'price':p_price if isinstance(p_price, (int, float)) else 0}
+                                    if p_unit:
+                                        if p_unit not in units:
+                                            condition_unit = Q(label=p_unit) | Q(label__icontains=p_unit)
+                                            condition_unit |= Q(name=p_unit) | Q(name__icontains=p_unit)
+                                            unit = Unit.objects.filter(condition_unit).first()
+                                            if not unit:
+                                                unit = Unit(label=p_unit, name=p_unit)
+                                                try:
+                                                    unit.save()
+                                                except Exception as e:
+                                                    self.loge(e)
+                                                    unit = None
+                                            if unit:
+                                                units[p_unit] = unit
+                                        if p_unit not in units:
+                                            product_kwargs['unit'] = units[p_unit]
+                                    if p_group:
+                                        if p_group not in groups:
+                                            groups[p_group], created_group = ProductGroup.objects.get_or_create(name__icontains=p_group, defaults={'name':p_group})
+                                        product_kwargs['group'] = groups[p_group]
+                                    p = Product(**product_kwargs)
+                                    try:
+                                        p.save()
+                                    except Exception as e:
+                                        self.loge(e)
+                                        msg_err += f'; {e}'
+                                        continue
+                                    count_created += 1
+                                    time.sleep(.01)#FOR STRONG NEXT EAN13 GENERATION
+                                    barcode = f'{p_barcode}' if p_barcode is not None else EAN13(f'{round(time.time()*1000)}').ean
+                                    if barcode:
+                                        b, created = BarCode.objects.get_or_create(id=barcode)
+                                        if b:
+                                            p.barcodes.add(b)
+                                    if p_count:
+                                        if not doc_income:
+                                            t, created = DocType.objects.get_or_create(alias='balance', defaults={'alias':'balance', 'name':'Balance'})
+                                            doc_income = get_model('core.Doc')(type=t, author=request.user)
+                                            try:
+                                                doc_income.save()
+                                            except Exception as e:
+                                                self.loge(e)
+                                                msg_err += f'; {e}'
+                                        if doc_income:
+                                            r = get_model('core.Record')(count=p_count, cost=p.cost, price=p.price, doc=doc_income, product=p)
+                                            try:
+                                                r.save()
+                                            except Exception as e:
+                                                self.loge(e)
+                                                msg_err += f'; {e}'
+                                            else:
+                                                try:
+                                                    get_model('core.Register')(rec=r).save()
+                                                except Exception as e:
+                                                    self.loge(e)
+                                                    msg_err += f'; {e}'
+                self.message_user(request, f'🆗 {file.name} ✏️ FILE SIZE={file.size} ✏️ CREATED={count_created}; {msg_err}', messages.SUCCESS)
+                return HttpResponseRedirect(request.get_full_path())
+        if not form:
+            form = UploadFileForm(initial={'_selected_action': request.POST.getlist(admin.helpers.ACTION_CHECKBOX_NAME)})
+        m = queryset.model._meta
+        context = {}
+        context['items'] = []
+        context['form'] = form
+        context['title'] = _('File')
+        context['current_action'] = sys._getframe().f_code.co_name
+        context['subtitle'] = 'admin_select_file_form'
+        context['site_title'] = queryset.model._meta.verbose_name
+        context['is_popup'] = True
+        context['is_nav_sidebar_enabled'] = True
+        context['site_header'] = _('Admin panel')
+        context['has_permission'] = True
+        context['site_url'] = reverse('admin:{}_{}_changelist'.format(m.app_label, m.model_name))
+        context['available_apps'] = (m.app_label,)
+        context['app_label'] = m.app_label
+        return render(request, 'admin_select_file_form.html', context)
+    from_xls_with_check.short_description = f'📍⚔📉{_("load from XLS file with check (slow)")}📈'
 
     def from_xls(self, request, queryset, **kwargs):
         from barcode import EAN13

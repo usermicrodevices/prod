@@ -2,6 +2,7 @@ import json, logging
 
 from django.http import JsonResponse
 from django.views import View
+from django.views.generic import ListView, DetailView
 from django.core.serializers import serialize#, JSONSerializer
 from django.core.serializers.json import DjangoJSONEncoder
 #from django.core.signing import Signer
@@ -10,11 +11,13 @@ from django.contrib.auth.decorators import login_required, login_not_required
 from django.views.decorators.csrf import csrf_exempt, csrf_protect, requires_csrf_token, ensure_csrf_cookie
 from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_http_methods
+from django.core.paginator import Paginator
 from django.conf import settings
 from django.db.models import F
 
 from users.models import User
-from refs.models import Product
+from refs.models import DocType, Product
+from core.models import Doc, Record
 
 
 @csrf_exempt
@@ -68,15 +71,11 @@ def url_logout(request):
     return JsonResponse({'success':"You're logged out."})
 
 
-#import asyncio
 class ProductsView(View):
     queryset = Product.objects.all()
 
-    #@method_decorator([login_required, csrf_protect, requires_csrf_token, ensure_csrf_cookie])
-    #async def get(self, request, *args, **kwargs):
     @method_decorator([ensure_csrf_cookie])
     def get(self, request, *args, **kwargs):
-        #await asyncio.sleep(1)
         data = serialize('json', self.queryset, fields=('id', 'article', 'name', 'cost', 'price', 'barcodes', 'currency'))
         return JsonResponse(data, safe=False)
 
@@ -90,8 +89,83 @@ class ProductsCashView(ProductsView):
         #qs = self.queryset.annotate(curr=F('currency__name')).prefetch_related('currency', 'barcodes').values('id', 'article', 'name', 'price', 'barcodes', 'curr')
         #json_data = json.dumps(list(qs), cls=DjangoJSONEncoder)
         #data = {it['id']:dict(filter(dflt, it.items())) for it in qs}
-        data = {}
+        data = []
         for it in self.queryset.prefetch_related('currency', 'barcodes', 'qrcodes', 'group', 'unit'):
-            data[it.id] = {'article':it.article, 'name':it.name, 'price':it.price, 'barcodes':list(it.barcodes.values_list('id', flat=True)), 'qrcodes':list(it.qrcodes.values_list('id', flat=True)), 'currency':it.currency.name, 'group':it.group.name, 'unit':it.unit.label}
+            data.append({'id':it.id, 'article':it.article, 'name':it.name, 'price':it.price, 'barcodes':list(it.barcodes.values_list('id', flat=True)), 'qrcodes':list(it.qrcodes.values_list('id', flat=True)), 'currency':it.currency.name if it.currency else '', 'grp':it.group.name if it.group else '', 'unit':it.unit.label if it.unit else ''})
         json_data = json.dumps(data, cls=DjangoJSONEncoder)
+        return JsonResponse(json_data, safe=False)
+
+
+class DocView(DetailView):
+    context_object_name = 'doc'
+    queryset = Doc.objects.none()
+
+    @method_decorator([ensure_csrf_cookie])
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['doc_list'] = Doc.objects.all()
+        return context
+
+    @method_decorator([ensure_csrf_cookie])
+    def get(self, request, *args, **kwargs):
+        data = serialize('json', self.queryset, fields=('id', 'article', 'name', 'cost', 'price', 'barcodes', 'currency'))
+        return JsonResponse(data, safe=False)
+
+
+class DocCashAddView(DocView):
+    context_object_name = 'doc-cash'
+
+    @method_decorator([ensure_csrf_cookie])
+    def post(self, request, *args, **kwargs):
+        try:
+            data = json.loads(request.body)
+        except json.decoder.JSONDecodeError as e:
+            logging.error(e)
+            return JsonResponse({'result':f'error: {e}'}, status=400)
+        except Exception as e:
+            logging.error(e)
+            return JsonResponse({'result':f'error: {e}'}, status=500)
+        sum_final = data.get('sum_final', 0)
+        records = data.get('records', [])
+        if records and sum_final:
+            t, created = DocType.objects.get_or_create(alias='sale', defaults={'alias':'sale', 'name':'Sale'})
+            doc = Doc(type=t, author=request.user)
+            try:
+                doc.save()
+            except Exception as e:
+                logging.error(e)
+                return JsonResponse({'result':f'error: {e}'}, status=500)
+            else:
+                for r in records:
+                    try:
+                        p = Product.objects.get(pk=r['product'])
+                    except Exception as e:
+                        logging.error([r, e])
+                    else:
+                        record = Record(count=r['count'], cost=p.cost, price=r['price'], doc=doc, currency=p.currency, product=p)
+                        try:
+                            record.save()
+                        except Exception as e:
+                            logging.error([r, record, e])
+        return JsonResponse({'result':'success', 'doc':f'{doc.id}'})
+
+
+class DocsView(ListView):
+    paginate_by = 10
+    model = Doc
+    context_object_name = 'docs'
+    queryset = Doc.objects.all()
+
+    @method_decorator([ensure_csrf_cookie])
+    def get(self, request, *args, **kwargs):
+        if request.GET:
+            self.queryset = self.queryset.filter(**request.GET)
+        paginator = Paginator(self.queryset, self.paginate_by)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+        logging.debug(page_obj.object_list)
+        #data = {'page':page_number, 'docs':[self.queryset]}
+        #json_data = json.dumps(data, cls=DjangoJSONEncoder)
+        json_data = serialize('json', page_obj, fields=('id', 'created_at', 'registered_at', 'owner', 'contractor', 'type', 'tax', 'sale_point', 'sum_final', 'author'))
+        logging.debug(json_data)
         return JsonResponse(json_data, safe=False)

@@ -5,8 +5,8 @@ from django.core.exceptions import MultipleObjectsReturned
 from django.contrib.auth import get_user_model
 #from django.contrib.auth.models import Group
 from django.contrib.auth.hashers import make_password
-from django.test import Client
 from django.utils import timezone as django_timezone
+from django.test import Client
 
 from html.parser import HTMLParser
 
@@ -80,3 +80,22 @@ class Usr(TransactionTestCase):
         print('Request♥', response.request)
         print('Response♡', response, response.headers)
         print('DATA⋆', eval(json.loads(response.content)))
+
+    def test_docs(self):
+        print()
+        url = '/api/docs/'
+        print('⚽GET', url)
+        response = self.client.get(url, headers={'X-CSRFToken':self.csrfmiddlewaretoken})
+        self.assertEqual(response.status_code, 200)
+        print('Request♥', response.request)
+        print('Response♡', response, response.headers)
+        print('DATA⋆', eval(json.loads(response.content.decode('utf8').replace('null', 'None'))))
+        print()
+        url = '/api/doc/cash/'
+        data = json.dumps({'sum_final':1000, 'records':[{'product':1, 'count':10, 'price':45}, {'product':2, 'count':10, 'price':63}]})
+        print('⚽POST', url, data)
+        response = self.client.post(url, data, 'json', headers={'X-CSRFToken':self.csrfmiddlewaretoken})
+        self.assertEqual(response.status_code, 200)
+        print('Request♥', response.request)
+        print('Response♡', response, response.headers)
+        print('DATA⋆', json.loads(response.content))
