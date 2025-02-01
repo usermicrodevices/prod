@@ -143,25 +143,29 @@ class DocCashAddView(DocView):
             default_contractor = Company.objects.filter(extinfo__default_cash_contractor=True).first()
             id_contractor = data.get('contractor', default_contractor.id if default_contractor else 2)
             t, created = DocType.objects.get_or_create(alias='sale', defaults={'alias':'sale', 'name':'Sale'})
-            doc = Doc(type=t, registered_at=parse_datetime(registered_at), owner_id=id_owner, contractor=id_contractor, author=request.user)
-            try:
-                doc.save()
-            except Exception as e:
-                logging.error(e)
-                return JsonResponse({'result':f'error: {e}'}, status=500)
-            else:
-                for r in records:
+            doc = Doc(type=t, registered_at=parse_datetime(registered_at), owner_id=id_owner, contractor_id=id_contractor, author=request.user)
+            recs = []
+            for r in records:
+                try:
+                    p = Product.objects.get(pk=r['product'])
+                except Exception as e:
+                    logging.error([r, e])
+                    return JsonResponse({'result':f'error; {r}; {e}'}, status=500)
+                else:
+                    recs.append(Record(count=r['count'], cost=p.cost, price=r['price'], doc=doc, currency=p.currency, product=p))
+            if recs:
+                try:
+                    doc.save()
+                except Exception as e:
+                    logging.error(e)
+                    return JsonResponse({'result':f'error: {e}'}, status=500)
+                else:
                     try:
-                        p = Product.objects.get(pk=r['product'])
+                        objs = Record.objects.bulk_create(recs, ignore_conflicts=True)
                     except Exception as e:
-                        logging.error([r, e])
-                    else:
-                        record = Record(count=r['count'], cost=p.cost, price=r['price'], doc=doc, currency=p.currency, product=p)
-                        try:
-                            record.save()
-                        except Exception as e:
-                            logging.error([r, record, e])
-        return JsonResponse({'result':'success', 'doc':f'{doc.id}'})
+                        logging.error([doc, recs, e])
+                    return JsonResponse({'result':'success', 'doc':f'{doc.id}', 'records_count':len(objs)})
+        return JsonResponse({'result':'error; request data invalid'}, status=400)
 
 
 class DocsView(ListView):
