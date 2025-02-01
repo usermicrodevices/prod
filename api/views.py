@@ -14,9 +14,10 @@ from django.views.decorators.http import require_http_methods
 from django.core.paginator import Paginator
 from django.conf import settings
 from django.db.models import F
+from django.utils.dateparse import parse_datetime
 
 from users.models import User
-from refs.models import DocType, Product
+from refs.models import Company, DocType, Product
 from core.models import Doc, Record
 
 
@@ -136,9 +137,13 @@ class DocCashAddView(DocView):
             return JsonResponse({'result':f'error: {e}'}, status=500)
         sum_final = data.get('sum_final', 0)
         records = data.get('records', [])
-        if records and sum_final:
+        registered_at = data.get('registered_at', '')
+        if records and sum_final and registered_at:
+            id_owner = data.get('owner', request.user.default_company.id if request.user.default_company else 1)
+            default_contractor = Company.objects.filter(extinfo__default_cash_contractor=True).first()
+            id_contractor = data.get('contractor', default_contractor.id if default_contractor else 2)
             t, created = DocType.objects.get_or_create(alias='sale', defaults={'alias':'sale', 'name':'Sale'})
-            doc = Doc(type=t, author=request.user)
+            doc = Doc(type=t, registered_at=parse_datetime(registered_at), owner_id=id_owner, contractor=id_contractor, author=request.user)
             try:
                 doc.save()
             except Exception as e:
