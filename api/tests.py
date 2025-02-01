@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 
 from django.test import TransactionTestCase
 from django.core.exceptions import MultipleObjectsReturned
@@ -6,9 +7,15 @@ from django.contrib.auth import get_user_model
 #from django.contrib.auth.models import Group
 from django.contrib.auth.hashers import make_password
 from django.utils import timezone as django_timezone
+from django.apps import apps as django_apps
 from django.test import Client
 
 from html.parser import HTMLParser
+
+
+def get_model(app_model):
+    app_name, model_name = app_model.split('.')
+    return django_apps.get_app_config(app_name).get_model(model_name)
 
 
 class CSRFParser(HTMLParser):
@@ -92,9 +99,11 @@ class Usr(TransactionTestCase):
         print('DATA⋆', eval(json.loads(response.content.decode('utf8').replace('null', 'None'))))
         print()
         url = '/api/doc/cash/'
-        data = json.dumps({'sum_final':1000, 'records':[{'product':1, 'count':10, 'price':45}, {'product':2, 'count':10, 'price':63}]})
+        prods = get_model('refs.Product').objects.all()[:5]
+        data = json.dumps({'sum_final':1000, 'registered_at':datetime.now().astimezone().strftime('%Y-%m-%dT%H:%M:%S %z'), 'records':[{'product':p.id, 'count':10, 'price':f'{p.price}'} for p in prods]})
         print('⚽POST', url, data)
         response = self.client.post(url, data, 'json', headers={'X-CSRFToken':self.csrfmiddlewaretoken})
+        print('CONTENT♡', response.content)
         self.assertEqual(response.status_code, 200)
         print('Request♥', response.request)
         print('Response♡', response, response.headers)
