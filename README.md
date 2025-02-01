@@ -1,6 +1,6 @@
 # production
 [![badge](https://img.shields.io/badge/license-MIT-blue)](https://github.com/usermicrodevices/prod/blob/main/LICENSE)
-django shop
+django shop based on web-admin interface, also you can clone and build multiplatform frontend ["prod-flet"](https://github.com/usermicrodevices/prod-flet/)
 ![image](./screen.png "main screen")
 
 # installation
