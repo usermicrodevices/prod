@@ -91,7 +91,16 @@ class ProductsCashView(ProductsView):
         #data = {it['id']:dict(filter(dflt, it.items())) for it in qs}
         data = []
         for it in self.queryset.prefetch_related('currency', 'barcodes', 'qrcodes', 'group', 'unit'):
-            data.append({'id':it.id, 'article':it.article, 'name':it.name, 'price':it.price, 'barcodes':list(it.barcodes.values_list('id', flat=True)), 'qrcodes':list(it.qrcodes.values_list('id', flat=True)), 'currency':it.currency.name if it.currency else '', 'grp':it.group.name if it.group else '', 'unit':it.unit.label if it.unit else ''})
+            grp = ''
+            if it.group:
+                grp = {'id':it.group.id, 'name':it.group.name}
+            unit = ''
+            if it.unit:
+                unit = {'id':it.unit.id, 'label':it.unit.label}
+            currency = ''
+            if it.currency:
+                currency = {'id':it.currency.id, 'name':it.currency.name}
+            data.append({'id':it.id, 'article':it.article, 'name':it.name, 'cost':0.0, 'price':it.price, 'barcodes':list(it.barcodes.values_list('id', flat=True)), 'qrcodes':list(it.qrcodes.values_list('id', flat=True)), 'currency':currency, 'grp':grp, 'unit':unit})
         json_data = json.dumps(data, cls=DjangoJSONEncoder)
         return JsonResponse(json_data, safe=False)
 
