@@ -18,14 +18,14 @@ from django.utils.dateparse import parse_datetime
 
 from users.models import User
 from refs.models import Company, DocType, Product
-from core.models import Doc, Record
+from core.models import Doc, Record, Register
 
 
 @csrf_exempt
 @login_not_required
-@require_http_methods(["POST"])
+@require_http_methods(['POST'])
 def url_login(request):
-    if request.method == "POST":
+    if request.method == 'POST':
         if request.session.test_cookie_worked() or True:
             try:
                 request.session.delete_test_cookie()
@@ -63,7 +63,7 @@ def url_login(request):
     return JsonResponse({'result':'error: only POST supported'}, status=400)
 
 @csrf_exempt
-@require_http_methods(["POST"])
+@require_http_methods(['POST'])
 def url_logout(request):
     try:
         del request.session[HASH_SESSION_KEY]
@@ -122,7 +122,7 @@ class DocView(DetailView):
         return JsonResponse(data, safe=False)
 
 
-class DocCashAddView(DocView):
+class DocCashAddView(View):
     context_object_name = 'doc-cash'
 
     @method_decorator([ensure_csrf_cookie])
@@ -142,8 +142,9 @@ class DocCashAddView(DocView):
             id_owner = data.get('owner', request.user.default_company.id if request.user.default_company else 1)
             default_contractor = Company.objects.filter(extinfo__default_cash_contractor=True).first()
             id_contractor = data.get('contractor', default_contractor.id if default_contractor else 2)
-            t, created = DocType.objects.get_or_create(alias='sale', defaults={'alias':'sale', 'name':'Sale'})
-            doc = Doc(type=t, registered_at=parse_datetime(registered_at), owner_id=id_owner, contractor_id=id_contractor, author=request.user)
+            dtype = data.get('type', 'sale')
+            t, created = DocType.objects.get_or_create(alias=dtype, defaults={'alias':dtype, 'name':dtype.title()})
+            doc = Doc(type=t, registered_at=parse_datetime(registered_at), owner_id=id_owner, contractor_id=id_contractor, author=request.user, sum_final=sum_final)
             recs = []
             for r in records:
                 try:
@@ -161,10 +162,22 @@ class DocCashAddView(DocView):
                     return JsonResponse({'result':f'error: {e}'}, status=500)
                 else:
                     try:
-                        objs = Record.objects.bulk_create(recs, ignore_conflicts=True)
+                        obj_recs = Record.objects.bulk_create(recs)
                     except Exception as e:
                         logging.error([doc, recs, e])
-                    return JsonResponse({'result':'success', 'doc':f'{doc.id}', 'records_count':len(objs)})
+                    else:
+                        logging.debug(obj_recs)
+                        regs = []
+                        for obj in obj_recs:
+                            regs.append(Register(rec=obj))
+                        if regs:
+                            try:
+                                obj_regs = Register.objects.bulk_create(regs)
+                            except Exception as e:
+                                logging.error([doc, regs, e])
+                            else:
+                                logging.debug(obj_regs)
+                    return JsonResponse({'result':'success', 'doc':f'{doc.id}', 'records_count':len(obj_recs)})
         return JsonResponse({'result':'error; request data invalid'}, status=400)
 
 
