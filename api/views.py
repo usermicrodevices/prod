@@ -177,6 +177,11 @@ class DocCashAddView(View):
                                 logging.error([doc, regs, e])
                             else:
                                 logging.debug(obj_regs)
+                                for reg in obj_regs:
+                                    try:
+                                        reg.reset_admin_product_cache()
+                                    except Exception as e:
+                                        logging.error([reg, e])
                     return JsonResponse({'result':'success', 'doc':f'{doc.id}', 'records_count':len(obj_recs)})
         return JsonResponse({'result':'error; request data invalid'}, status=400)
 
