@@ -206,3 +206,13 @@ ADMIN_SET_DOCUMENT_RECORD_PRICES = {'check_empty_cost':False, 'check_empty_price
 BEHAVIOR_COST = {'register_change_referece':True, 'select_from_register':False, 'select_during_incoming':True, 'select_during_sale':False}
 BEHAVIOR_PRICE = {'register_change_referece':True, 'select_from_register':False, 'select_during_incoming':True, 'select_during_sale':True}
 BEHAVIOR_COUNT = {'select_from_register':True, 'select_during_incoming':True, 'select_during_sale':True, 'select_focus':'elem_count.focus();'}
+
+def NEW_ARTICLE_GENERATOR(obj_model, default=''):
+    try:
+        last_article = obj_model.objects.filter(article__regex=r'^Y[0-9]{1,4}$').order_by('-article').only('article').first().article
+    except Exception as e:
+        pass
+    else:
+        if last_article:
+            return f'''Y{f'{int(last_article[1:]) + 1}'.zfill(4)}'''
+    return default
