@@ -304,7 +304,7 @@ class ProductGroup(models.Model):
         ordering = ['name']
 
 
-class Product(models.Model):
+class Product(CustomAbstractModel):
     article = models.CharField(max_length=191, default=uuid4, null=False, blank=False, verbose_name=_('article'), help_text=_('product article'))
     name = models.CharField(max_length=191, default='', verbose_name=_('name'), help_text=_('Caption of item'))
     cost = models.DecimalField(max_digits=15, decimal_places=3, default=0, null=False, blank=False, verbose_name=_('cost'), help_text=_('default cost'))

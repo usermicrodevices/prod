@@ -704,7 +704,7 @@ class ProductAdmin(CustomModelAdmin):
         #js = ['admin/js/autocomplete.js', 'admin/js/vendor/select2/select2.full.js']
 
     def changelist_view(self, request, extra_context=None):
-        if 'action' in request.POST and request.POST['action'] == 'reset_cached':
+        if 'action' in request.POST and request.POST['action'] in ['from_xls_with_check', 'from_xls', 'reset_cached']:
             if not request.POST.getlist(ACTION_CHECKBOX_NAME):
                 post = request.POST.copy()
                 p = Product.objects.first()
@@ -886,14 +886,39 @@ class ProductAdmin(CustomModelAdmin):
                             if msg_err and msg_err[-1] != '\n':
                                 msg_err += '\n'
                             row_index += 1
-                            v = list(row)
+                            p_group, p_code, p_name, p_article, p_unit, p_price, p_cost, p_barcode, p_count = '', 0, '', '', '', 0, 0, '', 0
+                            i = 0
                             try:
-                                p_group, p_code, p_name, p_article, p_unit, p_price, p_cost, p_barcode, p_count = [i.value for i in v]
+                                for it in list(row):
+                                    match i:
+                                        case 0:
+                                            p_group = it.value
+                                        case 1:
+                                            p_code = it.value
+                                        case 2:
+                                            p_name = it.value
+                                        case 3:
+                                            p_article = it.value
+                                        case 4:
+                                            p_unit = it.value
+                                        case 5:
+                                            p_price = it.value
+                                        case 6:
+                                            p_cost = it.value
+                                        case 7:
+                                            p_barcode = it.value
+                                        case 8:
+                                            p_count = it.value
+                                        case _:
+                                            break
+                                    i += 1
                             except Exception as e:
                                 self.loge(e)
                                 msg_err += f'ROW {row_index}: {e}'
                             else:
-                                if Product.objects.filter(article=p_article).exists():
+                                if not p_article and hasattr(settings, 'NEW_ARTICLE_GENERATOR'):
+                                    p_article = settings.NEW_ARTICLE_GENERATOR(Product, f'{round(time.time())}')
+                                if Product.objects.filter(Q(name=p_name) | Q(article=p_article)).exists():
                                     self.logi('PRODUCT', p_article, p_name, 'EXISTS')
                                 else:
                                     product_kwargs = {'article':p_article if p_article else f'{timestamp+row_index}', 'name':p_name, 'cost':p_cost if isinstance(p_cost, (int, float)) else 0, 'price':p_price if isinstance(p_price, (int, float)) else 0}
@@ -1000,14 +1025,37 @@ class ProductAdmin(CustomModelAdmin):
                         row_index = 0
                         for row in list_rows[1:]:
                             row_index += 1
-                            v = list(row)
+                            p_group, p_code, p_name, p_article, p_unit, p_price, p_cost, p_barcode, p_count = '', 0, '', '', '', 0, 0, '', 0
+                            i = 0
                             try:
-                                p_group, p_code, p_name, p_article, p_unit, p_price, p_cost, p_barcode, p_count = [i.value for i in v]
+                                for it in list(row):
+                                    match i:
+                                        case 0:
+                                            p_group = it.value
+                                        case 1:
+                                            p_code = it.value
+                                        case 2:
+                                            p_name = it.value
+                                        case 3:
+                                            p_article = it.value
+                                        case 4:
+                                            p_unit = it.value
+                                        case 5:
+                                            p_price = it.value
+                                        case 6:
+                                            p_cost = it.value
+                                        case 7:
+                                            p_barcode = it.value
+                                        case 8:
+                                            p_count = it.value
+                                        case _:
+                                            break
+                                    i += 1
                             except Exception as e:
                                 self.loge(e)
                                 msg_err += f'ROW {row_index}: {e}'
                             else:
-                                if Product.objects.filter(article=p_article).exists():
+                                if Product.objects.filter(Q(name=p_name) | Q(article=p_article)).exists():
                                     self.logi('PRODUCT', p_article, p_name, 'EXISTS')
                                 else:
                                     product_kwargs = {'article':p_article if p_article else f'{timestamp+row_index}', 'name':p_name, 'cost':p_cost if isinstance(p_cost, (int, float)) else 0, 'price':p_price if isinstance(p_price, (int, float)) else 0}
@@ -1096,7 +1144,19 @@ class ProductAdmin(CustomModelAdmin):
     from_xls.short_description = f'⚔{_("load from XLS file")}'
 
     def to_xls(self, request, queryset):
-        output = self.queryset_to_xls(queryset.annotate(unit_name=F('unit__name'), barcode_first=F('barcodes__id'), qrcode_first=F('qrcodes__id')), {'group':{'width':20}, 'name':{'width':20}, 'article':{'width':20}, 'barcode_first':{'width':20, 'title':'barcode'}, 'unit_name':{'title':'unit'}, 'cost':{}, 'price':{}, 'qrcode_first':{'width':20, 'title':'qrcode'}})
+        queryset = queryset.annotate(unit_name=F('unit__name'), barcode_first=F('barcodes__id'), qrcode_first=F('qrcodes__id'))
+        columns = {
+            'group':{'width':20},
+            'id':{'width':10},
+            'name':{'width':20},
+            'article':{'width':20},
+            'unit_name':{'title':'unit'},
+            'price':{},
+            'cost':{},
+            'barcode_first':{'width':20, 'title':'barcode'},
+            'qrcode_first':{'width':20, 'title':'qrcode'}
+        }
+        output = self.queryset_to_xls(queryset, columns)
         if output:
             fn = '{}.xlsx'.format(django_timezone.now().strftime('%Y%m%d%H%M%S'))
             self.message_user(request, f'🆗 {_("Finished")} ✏️({fn})', messages.SUCCESS)
