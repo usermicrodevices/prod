@@ -73,25 +73,68 @@ def url_logout(request):
 
 
 class ProductsView(View):
-    queryset = Product.objects.all()
+    limit_default = 10
+    page_num_default = 1
+    model = Product
+    queryset = model.objects.all()
+
+    def serialize_handler(self, data, field_names='__all__'):
+        return serialize('json', data, fields=field_names)
+
+    def paginate(self, data, limit, page_num):
+        json_data, http_status = '{}', 200
+        paginator = Paginator(data, limit)
+        try:
+            paginated_data = paginator.page(page_num)
+        except Exception as e:
+            http_status = 400
+            logging.error(('limit', limit, 'page_num', page_num, e))
+            json_data = f'{{"error":"{e}"}}'
+        else:
+            logging.debug(paginated_data.object_list)
+            json_data = self.serialize_handler(paginated_data, ('id', 'article', 'name', 'cost', 'price', 'barcodes', 'currency'))
+        return paginator, json_data, http_status
 
     @method_decorator([ensure_csrf_cookie])
     def get(self, request, *args, **kwargs):
-        data = serialize('json', self.queryset, fields=('id', 'article', 'name', 'cost', 'price', 'barcodes', 'currency'))
-        return JsonResponse(data, safe=False)
+        logging.debug(('REQUEST.GET', request.GET))
+        request.GET._mutable = True
+        page_num = int(request.GET.pop('page', [self.page_num_default])[0])
+        limit = int(request.GET.pop('limit', [self.limit_default])[0])
+        paginator, json_data, http_status = self.paginate(self.queryset.filter(**request.GET), limit, page_num)
+        logging.debug(('JSON_DATA', json_data))
+        response = JsonResponse(json_data, safe=False, status=http_status)
+        response['count'] = paginator.count
+        response['num_pages'] = paginator.num_pages
+        response['page_min'] = paginator.page_range.start
+        response['page_max'] = paginator.page_range.stop
+        response['page'] = page_num
+        response['limit'] = limit
+        return response
 
 
 class ProductsCashView(ProductsView):
+    queryset = Product.objects.prefetch_related('currency', 'barcodes', 'qrcodes', 'group', 'unit')
 
-    @method_decorator([ensure_csrf_cookie])
-    def get(self, request, *args, **kwargs):
-        #def dflt(item):
-            #return False if item[0] == 'id' else True
-        #qs = self.queryset.annotate(curr=F('currency__name')).prefetch_related('currency', 'barcodes').values('id', 'article', 'name', 'price', 'barcodes', 'curr')
-        #json_data = json.dumps(list(qs), cls=DjangoJSONEncoder)
-        #data = {it['id']:dict(filter(dflt, it.items())) for it in qs}
-        data = []
-        for it in self.queryset.prefetch_related('currency', 'barcodes', 'qrcodes', 'group', 'unit'):
+    #@method_decorator([ensure_csrf_cookie])
+    #def get(self, request, *args, **kwargs):
+        # data = []
+        # for it in self.queryset.prefetch_related('currency', 'barcodes', 'qrcodes', 'group', 'unit'):
+        #     grp = ''
+        #     if it.group:
+        #         grp = {'id':it.group.id, 'name':it.group.name}
+        #     unit = ''
+        #     if it.unit:
+        #         unit = {'id':it.unit.id, 'label':it.unit.label}
+        #     currency = ''
+        #     if it.currency:
+        #         currency = {'id':it.currency.id, 'name':it.currency.name}
+        #     data.append({'id':it.id, 'article':it.article, 'name':it.name, 'cost':0.0, 'price':it.price, 'barcodes':list(it.barcodes.values_list('id', flat=True)), 'qrcodes':list(it.qrcodes.values_list('id', flat=True)), 'currency':currency, 'grp':grp, 'unit':unit})
+        # json_data = json.dumps(data, cls=DjangoJSONEncoder)
+        # return JsonResponse(json_data, safe=False)
+    def serialize_handler(self, data, field_names='__all__'):
+        list_data = []
+        for it in data:
             grp = ''
             if it.group:
                 grp = {'id':it.group.id, 'name':it.group.name}
@@ -101,9 +144,8 @@ class ProductsCashView(ProductsView):
             currency = ''
             if it.currency:
                 currency = {'id':it.currency.id, 'name':it.currency.name}
-            data.append({'id':it.id, 'article':it.article, 'name':it.name, 'cost':0.0, 'price':it.price, 'barcodes':list(it.barcodes.values_list('id', flat=True)), 'qrcodes':list(it.qrcodes.values_list('id', flat=True)), 'currency':currency, 'grp':grp, 'unit':unit})
-        json_data = json.dumps(data, cls=DjangoJSONEncoder)
-        return JsonResponse(json_data, safe=False)
+            list_data.append({'id':it.id, 'article':it.article, 'name':it.name, 'cost':0.0, 'price':it.price, 'barcodes':list(it.barcodes.values_list('id', flat=True)), 'qrcodes':list(it.qrcodes.values_list('id', flat=True)), 'currency':currency, 'grp':grp, 'unit':unit})
+        return json.dumps(list_data, cls=DjangoJSONEncoder)
 
 
 class DocView(DetailView):
@@ -190,7 +232,7 @@ class DocsView(ListView):
     paginate_by = 10
     model = Doc
     context_object_name = 'docs'
-    queryset = Doc.objects.all()
+    queryset = model.objects.none()
 
     @method_decorator([ensure_csrf_cookie])
     def get(self, request, *args, **kwargs):

@@ -87,6 +87,30 @@ class Usr(TransactionTestCase):
         print('Request♥', response.request)
         print('Response♡', response, response.headers)
         print('DATA⋆', eval(json.loads(response.content)))
+        print()
+        url = '/api/products/?page=1'
+        print('⚽GET', url)
+        response = self.client.get(url, headers={'X-CSRFToken':self.csrfmiddlewaretoken})
+        self.assertEqual(response.status_code, 200)
+        print('Request♥', response.request)
+        print('Response♡', response, response.headers)
+        print('DATA⋆', eval(json.loads(response.content)))
+        print()
+        url = '/api/products/?page=0'
+        print('⚽GET', url)
+        response = self.client.get(url, headers={'X-CSRFToken':self.csrfmiddlewaretoken})
+        self.assertEqual(response.status_code, 400)
+        print('Request♥', response.request)
+        print('Response♡', response, response.headers)
+        print('DATA⋆', eval(json.loads(response.content)))
+        print()
+        url = f'/api/products/?page={int(response.headers['page_max']) + 1}'
+        print('⚽GET', url)
+        response = self.client.get(url, headers={'X-CSRFToken':self.csrfmiddlewaretoken})
+        self.assertEqual(response.status_code, 400)
+        print('Request♥', response.request)
+        print('Response♡', response, response.headers)
+        print('DATA⋆', eval(json.loads(response.content)))
 
     def test_docs(self):
         print()
