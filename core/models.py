@@ -36,6 +36,12 @@ class CustomAbstractModel(models.Model):
             msg += f'::{arg}'
         logging.info(msg)
 
+    def logd(self, *args):
+        msg = f'❕{self.__class__.__name__}.{sys._getframe().f_back.f_code.co_name}'
+        for arg in args:
+            msg += f'::{arg}'
+        logging.debug(msg)
+
     def logw(self, *args):
         msg = f'⚠️{self.__class__.__name__}.{sys._getframe().f_back.f_code.co_name}'
         for arg in args:
@@ -205,7 +211,7 @@ class Register(CustomAbstractModel):
             if product_admin and hasattr(product_admin, '__objs__'):
                 if self.rec.product_id in product_admin.__objs__:
                     del product_admin.__objs__[self.rec.product_id]
-                self.logi(product_admin.__objs__)
+                self.logd(product_admin.__objs__)
 
 @receiver(post_save, sender=Register)
 def on_reg_post_save(sender, **kwargs):

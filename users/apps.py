@@ -18,6 +18,7 @@ def post_init_app():
         from .models import create_default_role_fields
         exclude_classes = ['CustomAbstractModel', 'Role', 'RoleModel', 'RoleField']
         models = inspect.getmembers(sys.modules['refs.models'], inspect.isclass) + inspect.getmembers(sys.modules['core.models'], inspect.isclass)
+        logging.debug('{} - MODELS = {}'.format(sys._getframe().f_code.co_name, models))
         for _, model_class in models:
             if model_class.__name__ not in exclude_classes and model_class.__module__ in ['refs.models', 'core.models'] and 'CacheManager' not in model_class.__name__:
                 try:
@@ -38,6 +39,10 @@ def post_init_app():
                         for r in get_model('users.Role').objects.all():
                             create_default_role_fields(r, rmodel)
 
+        #need once run this signal handler on start application
+        disconnected = connection_created.disconnect(initial_connection_to_db, sender)
+        logging.debug('{} - DISCONNECTED - {}'.format(sys._getframe().f_code.co_name, disconnected))
+
 
 class UsersConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
@@ -46,5 +51,5 @@ class UsersConfig(AppConfig):
 
     def ready(self):
         if 'runserver' in sys.argv:
-            logging.info('🏁 {}.{} :: {} 🏁'.format(self.__class__.__name__, sys._getframe().f_code.co_name, sys.argv))
-            #post_init_app()
+            logging.debug('🏁 {}.{} :: {} 🏁'.format(self.__class__.__name__, sys._getframe().f_code.co_name, sys.argv))
+            post_init_app()
