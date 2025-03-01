@@ -607,3 +607,15 @@ msgstr "Справочники"
 
 msgid "Core"
 msgstr "Главное"
+
+msgid "customer"
+msgstr "покупатель"
+
+msgid "Customer"
+msgstr "Покупатель"
+
+msgid "Customers"
+msgstr "Покупатели"
+
+msgid "customer of document"
+msgstr "покупатель в документе"
