@@ -31,7 +31,7 @@ from django.template import Context, Template
 
 from .models import Doc, Record, Register
 from users.models import User
-from refs.admin import CompanyFilter, DocTypeFilter, ProductFilter
+from refs.admin import CompanyFilter, DocTypeFilter, ProductFilter, CustomerFilter
 
 def get_model(app_model):
     app_name, model_name = app_model.split('.')
@@ -457,10 +457,10 @@ class RecordInlines(CustomTabularInline):
 
 
 class DocAdmin(CustomModelAdmin):
-    list_display = ('id', 'get_reg', 'created_at', 'registered_at', 'type', 'contractor', 'get_records', 'get_sum_cost', 'get_sum_price', 'sum_final', 'tax', 'owner', 'author', 'extinfo')
+    list_display = ('id', 'get_reg', 'created_at', 'registered_at', 'type', 'contractor', 'customer', 'get_records', 'get_sum_cost', 'get_sum_price', 'sum_final', 'tax', 'owner', 'author', 'extinfo')
     list_display_links = ('id', 'created_at', 'registered_at')
     search_fields = ('id', 'created_at', 'registered_at', 'owner__name', 'contractor__name', 'type__name', 'tax__name', 'sale_point__name', 'author__username', 'extinfo')
-    list_filter = (DocTypeFilter, ContractorCompanyFilter, OwnerCompanyFilter, ProductDocRecFilter)
+    list_filter = (DocTypeFilter, ContractorCompanyFilter, OwnerCompanyFilter, ProductDocRecFilter, CustomerFilter)
     actions = ('new_incoming_from_orders', 'registration', 'unregistration', 'recalculate_final_sum', 'order_to_xls', 'sales_receipt_to_printer')
     fieldsets = [
     (

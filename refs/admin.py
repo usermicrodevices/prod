@@ -28,7 +28,7 @@ from django.core.cache import caches
 from django.conf import settings
 from django.apps import apps as django_apps
 
-from .models import PrintTemplates, Unit, Currency, Country, Region, City, Tax, CompanyType, Company, SalePoint, Manufacturer, ProductModel, BarCode, QrCode, DocType, ProductGroup, Product
+from .models import PrintTemplates, Unit, Currency, Country, Region, City, Tax, CompanyType, Company, SalePoint, Manufacturer, ProductModel, BarCode, QrCode, DocType, ProductGroup, Product, Customer
 from users.models import User
 
 def get_model(app_model):
@@ -372,6 +372,24 @@ class DocTypeFilter(DropDownFilter):
             return queryset
         else:
             return queryset.filter(type=self.value())
+
+
+class CustomerFilter(DropDownFilter):
+    title = _('Customer')
+    parameter_name = 'customer'
+
+    def lookups(self, request, model_admin):
+        res = []
+        queryset = Customer.objects.only('id', 'name')
+        for it in queryset:
+            res.append((it.id, it.name))
+        return res
+
+    def queryset(self, request, queryset):
+        if not self.value():
+            return queryset
+        else:
+            return queryset.filter(customer=self.value())
 
 
 class CustomModelAdmin(admin.ModelAdmin):
@@ -1269,3 +1287,10 @@ class ProductAdmin(CustomModelAdmin):
     fix_barcodes.short_description = f'Ⅲ🔨 {_("fix barcodes")} 🔧'
 
 admin.site.register(Product, ProductAdmin)
+
+
+class CustomerAdmin(CustomModelAdmin):
+    list_display = ('id', 'name', 'extinfo')
+    list_display_links = ('id', 'name')
+    search_fields = ('id', 'name', 'extinfo')
+admin.site.register(Customer, CustomerAdmin)
