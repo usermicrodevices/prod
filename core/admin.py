@@ -465,7 +465,7 @@ class DocAdmin(CustomModelAdmin):
     fieldsets = [
     (
         None,
-        {'fields': [('registered_at', 'sum_final', 'owner', 'contractor', 'type', 'tax')]}
+        {'fields': [('registered_at', 'sum_final', 'owner', 'contractor', 'customer', 'type', 'tax')]}
     ),
     (
         'Advanced options',
