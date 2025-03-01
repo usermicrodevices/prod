@@ -93,6 +93,7 @@ class Doc(CustomAbstractModel):
     registered_at = models.DateTimeField(default=django_timezone.now, null=False, blank=False, verbose_name=_('registered date'), help_text=_('Date of registration'))
     owner = models.ForeignKey('refs.Company', default=1, null=False, blank=False, on_delete=models.CASCADE, related_name='owner_docs', related_query_name='owner_doc', verbose_name=_('owner'), help_text=_('owner of document'))
     contractor = models.ForeignKey('refs.Company', default=2, null=False, blank=False, on_delete=models.CASCADE, related_name='contractor_docs', related_query_name='contractor_doc', verbose_name=_('contractor'), help_text=_('contractor of document'))
+    customer = models.ForeignKey('refs.Customer', default=None, null=True, blank=True, on_delete=models.SET_NULL, verbose_name=_('customer'), help_text=_('customer of document'))
     type = models.ForeignKey('refs.DocType', default=1, null=False, blank=False, on_delete=models.CASCADE, verbose_name=_('type'), help_text=_('type of document'))
     tax = models.ForeignKey('refs.Tax', default=1, null=False, blank=False, on_delete=models.CASCADE, verbose_name=_('tax'), help_text=_('tax of document'))
     sale_point = models.ForeignKey('refs.SalePoint', default=None, null=True, blank=True, on_delete=models.SET_NULL, verbose_name=_('sale point'), help_text=_('sale point of document'))

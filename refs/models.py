@@ -326,3 +326,16 @@ class Product(CustomAbstractModel):
 
     def __str__(self):
         return self.name
+
+
+class Customer(CustomAbstractModel):
+    name = models.CharField(max_length=191, default='', null=False, blank=False, verbose_name=_('name'), help_text=_('Caption of item'))
+    extinfo = JSONField(default=dict, blank=True)
+
+    class Meta:
+        verbose_name = f'📦{_("Customer")}'
+        verbose_name_plural = f'📦{_("Customers")}'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name

@@ -91,18 +91,21 @@ class ProductsView(View):
             logging.error(('limit', limit, 'page_num', page_num, e))
             json_data = f'{{"error":"{e}"}}'
         else:
-            logging.debug(paginated_data.object_list)
+            if settings.DEBUG:
+                logging.debug(paginated_data.object_list)
             json_data = self.serialize_handler(paginated_data, ('id', 'article', 'name', 'cost', 'price', 'barcodes', 'currency'))
         return paginator, json_data, http_status
 
     @method_decorator([ensure_csrf_cookie])
     def get(self, request, *args, **kwargs):
-        logging.debug(('REQUEST.GET', request.GET))
+        if settings.DEBUG:
+            logging.debug(('REQUEST.GET', request.GET))
         request.GET._mutable = True
         page_num = int(request.GET.pop('page', [self.page_num_default])[0])
         limit = int(request.GET.pop('limit', [self.limit_default])[0])
         paginator, json_data, http_status = self.paginate(self.queryset.filter(**request.GET), limit, page_num)
-        logging.debug(('JSON_DATA', json_data))
+        if settings.DEBUG:
+            logging.debug(('JSON_DATA', json_data))
         response = JsonResponse(json_data, safe=False, status=http_status)
         response['count'] = paginator.count
         response['num_pages'] = paginator.num_pages
@@ -208,7 +211,8 @@ class DocCashAddView(View):
                     except Exception as e:
                         logging.error([doc, recs, e])
                     else:
-                        logging.debug(obj_recs)
+                        if settings.DEBUG:
+                            logging.debug(obj_recs)
                         regs = []
                         for obj in obj_recs:
                             regs.append(Register(rec=obj))
@@ -218,7 +222,8 @@ class DocCashAddView(View):
                             except Exception as e:
                                 logging.error([doc, regs, e])
                             else:
-                                logging.debug(obj_regs)
+                                if settings.DEBUG:
+                                    logging.debug(obj_regs)
                                 for reg in obj_regs:
                                     try:
                                         reg.reset_admin_product_cache()
@@ -241,9 +246,11 @@ class DocsView(ListView):
         paginator = Paginator(self.queryset, self.paginate_by)
         page_number = request.GET.get('page')
         page_obj = paginator.get_page(page_number)
-        logging.debug(page_obj.object_list)
+        if settings.DEBUG:
+            logging.debug(page_obj.object_list)
         #data = {'page':page_number, 'docs':[self.queryset]}
         #json_data = json.dumps(data, cls=DjangoJSONEncoder)
         json_data = serialize('json', page_obj, fields=('id', 'created_at', 'registered_at', 'owner', 'contractor', 'type', 'tax', 'sale_point', 'sum_final', 'author'))
-        logging.debug(json_data)
+        if settings.DEBUG:
+            logging.debug(json_data)
         return JsonResponse(json_data, safe=False)
