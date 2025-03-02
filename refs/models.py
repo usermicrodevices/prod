@@ -333,8 +333,8 @@ class Customer(CustomAbstractModel):
     extinfo = JSONField(default=dict, blank=True)
 
     class Meta:
-        verbose_name = f'📦{_("Customer")}'
-        verbose_name_plural = f'📦{_("Customers")}'
+        verbose_name = f'🕵{_("Customer")}'
+        verbose_name_plural = f'🕵{_("Customers")}'
         ordering = ['name']
 
     def __str__(self):

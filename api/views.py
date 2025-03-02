@@ -13,10 +13,11 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_http_methods
 from django.core.paginator import Paginator
 from django.conf import settings
-from django.db.models import F
+from django.db.models import F, Q, Sum
 from django.utils.dateparse import parse_datetime
+from django.shortcuts import get_object_or_404
 
-from users.models import User
+from users.models import User, RoleField
 from refs.models import Company, DocType, Product
 from core.models import Doc, Record, Register
 
@@ -72,6 +73,55 @@ def url_logout(request):
     return JsonResponse({'success':"You're logged out."})
 
 
+class ProductView(DetailView):
+    model = Product
+
+    def get_obj_or_404(self, *args, **kwargs):
+        obj = None
+        try:
+            obj = self.model.objects.get(**kwargs)
+        except self.model.DoesNotExist as e:
+            logging.warning(e)
+        except Exception as e:
+            logging.error(e)
+        return obj
+
+    def get_obj_count(self, instance):
+        SumIncome=Sum('rec__count', filter=Q(rec__doc__type__income=True), default=0)
+        SumExpense=Sum('rec__count', filter=Q(rec__doc__type__income=False), default=0)
+        try:
+            count = Register.objects.filter(rec__product_id=instance.id).aggregate(count=SumIncome-SumExpense)['count']
+        except Exception as e:
+            logging.error(e)
+        else:
+            return count
+        return 0
+
+    @method_decorator([ensure_csrf_cookie])
+    def get(self, request, *args, **kwargs):
+        logging.debug(request.user)
+        if not request.user:
+            return JsonResponse({'error':'USER NOT FOUND'}, status=401)
+        u = request.user
+        if not u.role:
+            return JsonResponse({'error':'USER ROLE NOT ACCESSIBLE'}, status=403)
+        obj = self.get_obj_or_404(**kwargs)
+        if obj:
+            role_fields = tuple(RoleField.objects.filter(role=u.role, role_model__app='refs', role_model__model=obj.__class__.__name__, read=True).values_list('value', flat=True))
+            data = serialize('json', [obj], fields=role_fields)
+            return JsonResponse(data, safe=False, headers={'count':self.get_obj_count(obj)})
+        return JsonResponse({'error':'NOT FOUND'}, status=404)
+
+    @method_decorator([ensure_csrf_cookie])
+    def head(self, *args, **kwargs):
+        count = 0
+        obj = self.get_obj_or_404(**kwargs)
+        if obj:
+            count = self.get_obj_count(obj)
+        response = JsonResponse({'status':'success'}, headers={'count': count})
+        return response
+
+
 class ProductsView(View):
     limit_default = 10
     page_num_default = 1
@@ -106,35 +156,14 @@ class ProductsView(View):
         paginator, json_data, http_status = self.paginate(self.queryset.filter(**request.GET), limit, page_num)
         if settings.DEBUG:
             logging.debug(('JSON_DATA', json_data))
-        response = JsonResponse(json_data, safe=False, status=http_status)
-        response['count'] = paginator.count
-        response['num_pages'] = paginator.num_pages
-        response['page_min'] = paginator.page_range.start
-        response['page_max'] = paginator.page_range.stop
-        response['page'] = page_num
-        response['limit'] = limit
+        rsp_hdrs = {'count':paginator.count, 'num_pages':paginator.num_pages, 'page_min':paginator.page_range.start, 'page_max':paginator.page_range.stop, 'page':page_num, 'limit':limit}
+        response = JsonResponse(json_data, safe=False, status=http_status, headers=rsp_hdrs)
         return response
 
 
 class ProductsCashView(ProductsView):
     queryset = Product.objects.prefetch_related('currency', 'barcodes', 'qrcodes', 'group', 'unit')
 
-    #@method_decorator([ensure_csrf_cookie])
-    #def get(self, request, *args, **kwargs):
-        # data = []
-        # for it in self.queryset.prefetch_related('currency', 'barcodes', 'qrcodes', 'group', 'unit'):
-        #     grp = ''
-        #     if it.group:
-        #         grp = {'id':it.group.id, 'name':it.group.name}
-        #     unit = ''
-        #     if it.unit:
-        #         unit = {'id':it.unit.id, 'label':it.unit.label}
-        #     currency = ''
-        #     if it.currency:
-        #         currency = {'id':it.currency.id, 'name':it.currency.name}
-        #     data.append({'id':it.id, 'article':it.article, 'name':it.name, 'cost':0.0, 'price':it.price, 'barcodes':list(it.barcodes.values_list('id', flat=True)), 'qrcodes':list(it.qrcodes.values_list('id', flat=True)), 'currency':currency, 'grp':grp, 'unit':unit})
-        # json_data = json.dumps(data, cls=DjangoJSONEncoder)
-        # return JsonResponse(json_data, safe=False)
     def serialize_handler(self, data, field_names='__all__'):
         list_data = []
         for it in data:
@@ -163,7 +192,7 @@ class DocView(DetailView):
 
     @method_decorator([ensure_csrf_cookie])
     def get(self, request, *args, **kwargs):
-        data = serialize('json', self.queryset, fields=('id', 'article', 'name', 'cost', 'price', 'barcodes', 'currency'))
+        data = serialize('json', self.queryset)
         return JsonResponse(data, safe=False)
 
 
@@ -250,7 +279,7 @@ class DocsView(ListView):
             logging.debug(page_obj.object_list)
         #data = {'page':page_number, 'docs':[self.queryset]}
         #json_data = json.dumps(data, cls=DjangoJSONEncoder)
-        json_data = serialize('json', page_obj, fields=('id', 'created_at', 'registered_at', 'owner', 'contractor', 'type', 'tax', 'sale_point', 'sum_final', 'author'))
+        json_data = serialize('json', page_obj, fields=('id', 'created_at', 'registered_at', 'owner', 'contractor', 'customer', 'type', 'tax', 'sale_point', 'sum_final', 'author'))
         if settings.DEBUG:
             logging.debug(json_data)
         return JsonResponse(json_data, safe=False)
