@@ -94,6 +94,24 @@ class RoleFieldAdmin(admin.ModelAdmin):
     search_fields = ['value', 'role__value', 'role_model__value']
     list_select_related = ['role', 'role_model']
     list_filter = ['role', 'role_model']
+    actions = ('set_read', 'reset_read', 'set_write', 'reset_write')
+
+    def set_read(self, request, queryset):
+        queryset.update(read=True)
+    set_read.short_description = f'☑{_("set role field for read")}√'
+
+    def reset_read(self, request, queryset):
+        queryset.update(read=False)
+    reset_read.short_description = f'☒{_("make role field unreadable")}☐'
+
+    def set_write(self, request, queryset):
+        queryset.update(write=True)
+    set_write.short_description = f'☑{_("set role field for write")}√'
+
+    def reset_write(self, request, queryset):
+        queryset.update(write=False)
+    reset_write.short_description = f'☒{_("make role field unwritable")}☐'
+
 admin.site.register(RoleField, RoleFieldAdmin)
 
 
@@ -105,7 +123,7 @@ admin.site.register(Permission, PermissionAdmin)
 
 
 class UserAdmin(BaseUserAdmin):
-    list_display = ('id', 'get_avatar', 'staff', 'get_username', 'email', 'first_name', 'last_name', 'get_role', 'last_login', 'get_groups', 'get_companies', 'get_sale_points')
+    list_display = ('id', 'get_avatar', 'staff', 'get_username', 'email', 'first_name', 'last_name', 'get_role', 'last_login', 'get_groups', 'get_companies', 'get_sale_points', 'default_company')
     search_fields = ('username', 'email', 'first_name', 'last_name', 'last_login', 'role__value', 'role__description', 'companies__name', 'sale_points__name')
     list_select_related = ('role',)
     list_filter = ('is_staff', 'is_superuser', 'is_active', 'role')

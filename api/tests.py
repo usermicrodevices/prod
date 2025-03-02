@@ -36,9 +36,9 @@ class Usr(TransactionTestCase):
 
     def setUp(self):
         self.test_password = 't0#e9@s8$t7'
-        self.user = get_user_model()(username=f'test_{int(django_timezone.now().timestamp())}', password=make_password(self.test_password), email='test@test.test', first_name='Test', last_name='tesT', is_staff=True, is_active=True, is_superuser=True)
+        self.user = get_user_model()(username=f'test_{int(django_timezone.now().timestamp())}', password=make_password(self.test_password), email='test@test.test', first_name='Test', last_name='tesT', is_staff=True, is_active=True, is_superuser=True, role = get_model('users.Role').objects.get(value='kassa'))
         self.user.save()
-        #self.user.groups.add(Group.objects.get(id=1))
+        ##self.user.groups.add(Group.objects.get(id=1))
         print(self.user.id, self.user, self.test_password)
         print()
 
@@ -111,6 +111,21 @@ class Usr(TransactionTestCase):
         print('Request♥', response.request)
         print('Response♡', response, response.headers)
         print('DATA⋆', eval(json.loads(response.content)))
+        print()
+        url = f'/api/product/1/'
+        print('⚽GET', url)
+        response = self.client.get(url, headers={'X-CSRFToken':self.csrfmiddlewaretoken})
+        #self.assertEqual(response.status_code, 200)
+        print('Request♥', response.request)
+        print('Response♡', response, response.headers)
+        print('DATA⋆', eval(json.loads(response.content).replace('null', 'None')))
+        print()
+        url = f'/api/product/1/'
+        print('⚽HEAD', url)
+        response = self.client.head(url, headers={'X-CSRFToken':self.csrfmiddlewaretoken})
+        #self.assertEqual(response.status_code, 200)
+        print('Request♥', response.request)
+        print('Response♡', response, response.headers)
 
     def test_docs(self):
         print()
