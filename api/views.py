@@ -248,6 +248,8 @@ class DocCashAddView(View, LogMixin):
         if records and sum_final and registered_at:
             id_owner = data.get('owner', request.user.default_company.id if request.user.default_company else 1)
             default_contractor = Company.objects.filter(extinfo__default_cash_contractor=True).first()
+            if not default_contractor and request.user.companies.count():
+                default_contractor = request.user.companies.first()
             id_contractor = data.get('contractor', default_contractor.id if default_contractor else 2)
             dtype = data.get('type', 'sale')
             doc_type, created = DocType.objects.get_or_create(alias=dtype, defaults={'alias':dtype, 'name':dtype.title()})

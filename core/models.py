@@ -123,6 +123,29 @@ def on_doc_pre_save(sender, **kwargs):
             if value:
                 instance.sum_final = value
 
+@receiver(post_save, sender=Doc)
+def on_doc_post_save(sender, **kwargs):
+    instance: Doc = kwargs['instance']
+    if not kwargs.get('created', False) and not instance.extinfo.get('not_use_post_save_auto_register', False):
+        recs = get_model('core.Record').objects.filter(doc=instance)
+        recs_count = recs.count()
+        regs = get_model('core.Register').objects.filter(rec__in=recs.values_list('id', flat=True))
+        if instance.type.auto_register:
+            if recs_count and recs_count != regs.count():
+                regs_new = []
+                for r in recs:
+                    regs_new.append(get_model('core.Register')(rec=r))
+                try:
+                    rgs = get_model('core.Register').objects.bulk_create(regs_new)
+                except Exception as e:
+                    instance.loge(e)
+        elif recs_count:
+            if regs.count():
+                try:
+                    regs.delete()
+                except Exception as e:
+                    instance.loge(e)
+
 
 class Record(CustomAbstractModel):
     count = models.DecimalField(max_digits=15, decimal_places=3, default=0, null=False, blank=False, verbose_name=_('count'), help_text=_('count of products'))
