@@ -1,4 +1,4 @@
-import json, logging
+import json, logging, sys
 
 from django.http import JsonResponse
 from django.views import View
@@ -11,7 +11,7 @@ from django.contrib.auth.decorators import login_required, login_not_required
 from django.views.decorators.csrf import csrf_exempt, csrf_protect, requires_csrf_token, ensure_csrf_cookie
 from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_http_methods
-from django.core.paginator import Paginator
+from django.core.paginator import EmptyPage, Paginator
 from django.conf import settings
 from django.db.models import F, Q, Sum
 from django.utils.dateparse import parse_datetime
@@ -31,7 +31,8 @@ def url_login(request):
             try:
                 request.session.delete_test_cookie()
             except Exception as e:
-                logging.error(e)
+                if settings.DEBUG:
+                    logging.debug(e)
                 request.session.set_test_cookie()
             try:
                 data = json.loads(request.body)
@@ -73,7 +74,34 @@ def url_logout(request):
     return JsonResponse({'success':"You're logged out."})
 
 
-class ProductView(DetailView):
+class LogMixin():
+
+    def logi(self, *args):
+        msg = f'ℹ{self.__class__.__name__}.{sys._getframe().f_back.f_code.co_name}'
+        for arg in args:
+            msg += f'::{arg}'
+        logging.info(msg)
+
+    def logw(self, *args):
+        msg = f'⚠{self.__class__.__name__}.{sys._getframe().f_back.f_code.co_name}'
+        for arg in args:
+            msg += f'::{arg}'
+        logging.warning(msg)
+
+    def logd(self, *args):
+        msg = f'‼{self.__class__.__name__}.{sys._getframe().f_back.f_code.co_name}'
+        for arg in args:
+            msg += f'::{arg}'
+        logging.debug(msg)
+
+    def loge(self, err, *args):
+        msg = f'🆘{self.__class__.__name__}.{err.__traceback__.tb_frame.f_code.co_name}::{err}::LINE={err.__traceback__.tb_lineno}'
+        for arg in args:
+            msg += f'::{arg}'
+        logging.error(msg)
+
+
+class ProductView(DetailView, LogMixin):
     model = Product
 
     def get_obj_or_404(self, *args, **kwargs):
@@ -81,9 +109,9 @@ class ProductView(DetailView):
         try:
             obj = self.model.objects.get(**kwargs)
         except self.model.DoesNotExist as e:
-            logging.warning(e)
+            self.logw(e)
         except Exception as e:
-            logging.error(e)
+            self.loge(e)
         return obj
 
     def get_obj_count(self, instance):
@@ -92,14 +120,15 @@ class ProductView(DetailView):
         try:
             count = Register.objects.filter(rec__product_id=instance.id).aggregate(count=SumIncome-SumExpense)['count']
         except Exception as e:
-            logging.error(e)
+            self.loge(e)
         else:
             return count
         return 0
 
     @method_decorator([ensure_csrf_cookie])
     def get(self, request, *args, **kwargs):
-        logging.debug(request.user)
+        if settings.DEBUG:
+            self.logd(request.user)
         if not request.user:
             return JsonResponse({'error':'USER NOT FOUND'}, status=401)
         u = request.user
@@ -122,7 +151,7 @@ class ProductView(DetailView):
         return response
 
 
-class ProductsView(View):
+class ProductsView(View, LogMixin):
     limit_default = 10
     page_num_default = 1
     model = Product
@@ -136,26 +165,30 @@ class ProductsView(View):
         paginator = Paginator(data, limit)
         try:
             paginated_data = paginator.page(page_num)
+        except EmptyPage as e:
+            http_status = 400
+            self.logw(e, 'limit', limit, 'page_num', page_num)
+            json_data = f'{{"error":"{e}"}}'
         except Exception as e:
             http_status = 400
-            logging.error(('limit', limit, 'page_num', page_num, e))
+            self.loge(e, type(e), 'limit', limit, 'page_num', page_num)
             json_data = f'{{"error":"{e}"}}'
         else:
             if settings.DEBUG:
-                logging.debug(paginated_data.object_list)
+                self.logd(paginated_data.object_list)
             json_data = self.serialize_handler(paginated_data, ('id', 'article', 'name', 'cost', 'price', 'barcodes', 'currency'))
         return paginator, json_data, http_status
 
     @method_decorator([ensure_csrf_cookie])
     def get(self, request, *args, **kwargs):
         if settings.DEBUG:
-            logging.debug(('REQUEST.GET', request.GET))
+            self.logd('REQUEST.GET', request.GET)
         request.GET._mutable = True
         page_num = int(request.GET.pop('page', [self.page_num_default])[0])
         limit = int(request.GET.pop('limit', [self.limit_default])[0])
         paginator, json_data, http_status = self.paginate(self.queryset.filter(**request.GET), limit, page_num)
         if settings.DEBUG:
-            logging.debug(('JSON_DATA', json_data))
+            self.logd('JSON_DATA', json_data)
         rsp_hdrs = {'count':paginator.count, 'num_pages':paginator.num_pages, 'page_min':paginator.page_range.start, 'page_max':paginator.page_range.stop, 'page':page_num, 'limit':limit}
         response = JsonResponse(json_data, safe=False, status=http_status, headers=rsp_hdrs)
         return response
@@ -180,7 +213,7 @@ class ProductsCashView(ProductsView):
         return json.dumps(list_data, cls=DjangoJSONEncoder)
 
 
-class DocView(DetailView):
+class DocView(DetailView, LogMixin):
     context_object_name = 'doc'
     queryset = Doc.objects.none()
 
@@ -196,7 +229,7 @@ class DocView(DetailView):
         return JsonResponse(data, safe=False)
 
 
-class DocCashAddView(View):
+class DocCashAddView(View, LogMixin):
     context_object_name = 'doc-cash'
 
     @method_decorator([ensure_csrf_cookie])
@@ -204,10 +237,10 @@ class DocCashAddView(View):
         try:
             data = json.loads(request.body)
         except json.decoder.JSONDecodeError as e:
-            logging.error(e)
+            self.loge(e)
             return JsonResponse({'result':f'error: {e}'}, status=400)
         except Exception as e:
-            logging.error(e)
+            self.loge(e)
             return JsonResponse({'result':f'error: {e}'}, status=500)
         sum_final = data.get('sum_final', 0)
         records = data.get('records', [])
@@ -217,14 +250,14 @@ class DocCashAddView(View):
             default_contractor = Company.objects.filter(extinfo__default_cash_contractor=True).first()
             id_contractor = data.get('contractor', default_contractor.id if default_contractor else 2)
             dtype = data.get('type', 'sale')
-            t, created = DocType.objects.get_or_create(alias=dtype, defaults={'alias':dtype, 'name':dtype.title()})
-            doc = Doc(type=t, registered_at=parse_datetime(registered_at), owner_id=id_owner, contractor_id=id_contractor, author=request.user, sum_final=sum_final)
+            doc_type, created = DocType.objects.get_or_create(alias=dtype, defaults={'alias':dtype, 'name':dtype.title()})
+            doc = Doc(type=doc_type, registered_at=parse_datetime(registered_at), owner_id=id_owner, contractor_id=id_contractor, author=request.user, sum_final=sum_final)
             recs = []
             for r in records:
                 try:
                     p = Product.objects.get(pk=r['product'])
                 except Exception as e:
-                    logging.error([r, e])
+                    self.loge(e, r)
                     return JsonResponse({'result':f'error; {r}; {e}'}, status=500)
                 else:
                     recs.append(Record(count=r['count'], cost=p.cost, price=r['price'], doc=doc, currency=p.currency, product=p))
@@ -232,37 +265,37 @@ class DocCashAddView(View):
                 try:
                     doc.save()
                 except Exception as e:
-                    logging.error(e)
+                    self.loge(e)
                     return JsonResponse({'result':f'error: {e}'}, status=500)
                 else:
                     try:
                         obj_recs = Record.objects.bulk_create(recs)
                     except Exception as e:
-                        logging.error([doc, recs, e])
+                        self.loge(e, doc, recs)
                     else:
                         if settings.DEBUG:
-                            logging.debug(obj_recs)
-                        regs = []
-                        for obj in obj_recs:
-                            regs.append(Register(rec=obj))
-                        if regs:
+                            self.logd(obj_recs)
+                        if doc_type.auto_register and obj_recs:
+                            regs = []
+                            for obj in obj_recs:
+                                regs.append(Register(rec=obj))
                             try:
                                 obj_regs = Register.objects.bulk_create(regs)
                             except Exception as e:
-                                logging.error([doc, regs, e])
+                                self.loge(e, doc, regs)
                             else:
                                 if settings.DEBUG:
-                                    logging.debug(obj_regs)
+                                    self.logd(obj_regs)
                                 for reg in obj_regs:
                                     try:
                                         reg.reset_admin_product_cache()
                                     except Exception as e:
-                                        logging.error([reg, e])
+                                        self.loge(e, reg)
                     return JsonResponse({'result':'success', 'doc':f'{doc.id}', 'records_count':len(obj_recs)})
         return JsonResponse({'result':'error; request data invalid'}, status=400)
 
 
-class DocsView(ListView):
+class DocsView(ListView, LogMixin):
     paginate_by = 10
     model = Doc
     context_object_name = 'docs'
@@ -276,10 +309,8 @@ class DocsView(ListView):
         page_number = request.GET.get('page')
         page_obj = paginator.get_page(page_number)
         if settings.DEBUG:
-            logging.debug(page_obj.object_list)
-        #data = {'page':page_number, 'docs':[self.queryset]}
-        #json_data = json.dumps(data, cls=DjangoJSONEncoder)
+            self.logd(page_obj.object_list)
         json_data = serialize('json', page_obj, fields=('id', 'created_at', 'registered_at', 'owner', 'contractor', 'customer', 'type', 'tax', 'sale_point', 'sum_final', 'author'))
         if settings.DEBUG:
-            logging.debug(json_data)
+            self.logd(json_data)
         return JsonResponse(json_data, safe=False)

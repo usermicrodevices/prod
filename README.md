@@ -7,6 +7,9 @@ build multiplatform frontend ["prod-flet"](https://github.com/usermicrodevices/p
 
 # installation
 ```
+sudo apt install postgresql
+sudo -u postgres createuser --superuser prod_user
+sudo -u postgres createdb --owner=prod_user prod_database
 git clone git@github.com:usermicrodevices/prod.git
 cd prod
 mkdir logs media static
