@@ -250,14 +250,14 @@ class DocCashAddView(View, LogMixin):
             default_contractor = Company.objects.filter(extinfo__default_cash_contractor=True).first()
             id_contractor = data.get('contractor', default_contractor.id if default_contractor else 2)
             dtype = data.get('type', 'sale')
-            t, created = DocType.objects.get_or_create(alias=dtype, defaults={'alias':dtype, 'name':dtype.title()})
-            doc = Doc(type=t, registered_at=parse_datetime(registered_at), owner_id=id_owner, contractor_id=id_contractor, author=request.user, sum_final=sum_final)
+            doc_type, created = DocType.objects.get_or_create(alias=dtype, defaults={'alias':dtype, 'name':dtype.title()})
+            doc = Doc(type=doc_type, registered_at=parse_datetime(registered_at), owner_id=id_owner, contractor_id=id_contractor, author=request.user, sum_final=sum_final)
             recs = []
             for r in records:
                 try:
                     p = Product.objects.get(pk=r['product'])
                 except Exception as e:
-                    self.loge([r, e])
+                    self.loge(e, r)
                     return JsonResponse({'result':f'error; {r}; {e}'}, status=500)
                 else:
                     recs.append(Record(count=r['count'], cost=p.cost, price=r['price'], doc=doc, currency=p.currency, product=p))
@@ -271,18 +271,18 @@ class DocCashAddView(View, LogMixin):
                     try:
                         obj_recs = Record.objects.bulk_create(recs)
                     except Exception as e:
-                        self.loge([doc, recs, e])
+                        self.loge(e, doc, recs)
                     else:
                         if settings.DEBUG:
                             self.logd(obj_recs)
-                        regs = []
-                        for obj in obj_recs:
-                            regs.append(Register(rec=obj))
-                        if regs:
+                        if doc_type.auto_register and obj_recs:
+                            regs = []
+                            for obj in obj_recs:
+                                regs.append(Register(rec=obj))
                             try:
                                 obj_regs = Register.objects.bulk_create(regs)
                             except Exception as e:
-                                self.loge([doc, regs, e])
+                                self.loge(e, doc, regs)
                             else:
                                 if settings.DEBUG:
                                     self.logd(obj_regs)
@@ -290,7 +290,7 @@ class DocCashAddView(View, LogMixin):
                                     try:
                                         reg.reset_admin_product_cache()
                                     except Exception as e:
-                                        self.loge([reg, e])
+                                        self.loge(e, reg)
                     return JsonResponse({'result':'success', 'doc':f'{doc.id}', 'records_count':len(obj_recs)})
         return JsonResponse({'result':'error; request data invalid'}, status=400)
 
