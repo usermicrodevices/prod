@@ -41,6 +41,8 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'shop.urls'
+LOGIN_URL = '/admin/login/'
+LOGIN_REDIRECT_URL = '/admin/login/'
 
 TEMPLATES = [
     {
