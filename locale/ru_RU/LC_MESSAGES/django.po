@@ -619,3 +619,9 @@ msgstr "Покупатели"
 
 msgid "customer of document"
 msgstr "покупатель в документе"
+
+msgid "changed"
+msgstr "изменено"
+
+msgid "change units"
+msgstr "поменять единицы измерения"
