@@ -728,7 +728,7 @@ class ProductAdmin(CustomModelAdmin):
     list_select_related = ('tax', 'model', 'group')
     list_filter = (ProductGroupFilter, ProductManufacturerFilter, ProductModelFilter, TaxFilter)
     autocomplete_fields = ('tax', 'model', 'group', 'barcodes', 'qrcodes')
-    actions = ('from_xls_with_check', 'from_xls', 'to_xls', 'price_to_xls', 'barcode_to_svg', 'fix_barcodes', 'reset_cached')
+    actions = ('from_xls_with_check', 'from_xls', 'to_xls', 'price_to_xls', 'barcode_to_svg', 'fix_barcodes', 'change_units', 'reset_cached')
 
     #class Media:
         #js = ['admin/js/autocomplete.js', 'admin/js/vendor/select2/select2.full.js']
@@ -1307,6 +1307,12 @@ class ProductAdmin(CustomModelAdmin):
                 msg += f'; {m}'
         self.message_user(request, msg, messages.SUCCESS)
     fix_barcodes.short_description = f'Ⅲ🔨 {_("fix barcodes")} 🔧'
+
+    def change_units(self, request, queryset):
+        it_first = queryset.first()
+        changed = queryset.exclude(unit_id=it_first.unit_id).update(unit_id=it_first.unit_id)
+        self.message_user(request, f'{_("changed")} {changed}', messages.SUCCESS)
+    change_units.short_description = f'🆔 {_("change units")} 🆗'
 
 admin.site.register(Product, ProductAdmin)
 
