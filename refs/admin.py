@@ -484,7 +484,7 @@ class CustomModelAdmin(admin.ModelAdmin):
                             tvalue = None
                             if isinstance(value, datetime):
                                 value = f'{value.strftime("%Y.%m.%d %H:%M:%S")}'
-                            elif isinstance(value, (int, float)):
+                            elif isinstance(value, (int, float, Decimal)):
                                 tvalue = 'as_number'
                             elif not isinstance(value, str):
                                 value = f'{value}'
@@ -834,7 +834,7 @@ class ProductAdmin(CustomModelAdmin):
                     if cnt <= int(k):
                         color = min_styles[k]
                         break
-        return format_html('<p><a href="{}/core/register/?rec__product={}" target="_blank" style="{}">{}</a></p>', settings.ADMIN_PATH_PREFIX, obj.id, color, cnt)
+        return format_html('<p><a href="{}/core/register/?rec__product={}" target="_blank" style="{}">{} {}</a></p>', settings.ADMIN_PATH_PREFIX, obj.id, color, cnt, obj.unit.label)
     count.short_description = _('Count')
 
     def get_sum(self, obj):
@@ -921,8 +921,18 @@ class ProductAdmin(CustomModelAdmin):
                                             p_unit = it.value
                                         case 5:
                                             p_price = it.value
+                                            if isinstance(p_price, str):
+                                                try:
+                                                    p_price = Decimal(p_price)
+                                                except Exception as e:
+                                                    self.loge(e)
                                         case 6:
                                             p_cost = it.value
+                                            if isinstance(p_cost, str):
+                                                try:
+                                                    p_cost = Decimal(p_cost)
+                                                except Exception as e:
+                                                    self.loge(e)
                                         case 7:
                                             p_barcode = it.value
                                         case 8:
@@ -939,7 +949,7 @@ class ProductAdmin(CustomModelAdmin):
                                 if Product.objects.filter(Q(name=p_name) | Q(article=p_article)).exists():
                                     self.logi('PRODUCT', p_article, p_name, 'EXISTS')
                                 else:
-                                    product_kwargs = {'article':p_article if p_article else f'{timestamp+row_index}', 'name':p_name, 'cost':p_cost if isinstance(p_cost, (int, float)) else 0, 'price':p_price if isinstance(p_price, (int, float)) else 0}
+                                    product_kwargs = {'article':p_article if p_article else f'{timestamp+row_index}', 'name':p_name, 'cost':p_cost if isinstance(p_cost, (int, float, Decimal)) else 0, 'price':p_price if isinstance(p_price, (int, float, Decimal)) else 0}
                                     if p_unit:
                                         if p_unit not in units:
                                             condition_unit = Q(label=p_unit) | Q(label__icontains=p_unit)
@@ -954,7 +964,7 @@ class ProductAdmin(CustomModelAdmin):
                                                     unit = None
                                             if unit:
                                                 units[p_unit] = unit
-                                        if p_unit not in units:
+                                        if p_unit in units:
                                             product_kwargs['unit'] = units[p_unit]
                                     if p_group:
                                         if p_group not in groups:
@@ -1162,13 +1172,13 @@ class ProductAdmin(CustomModelAdmin):
     from_xls.short_description = f'⚔{_("load from XLS file")}'
 
     def to_xls(self, request, queryset):
-        queryset = queryset.annotate(unit_name=F('unit__name'), barcode_first=F('barcodes__id'), qrcode_first=F('qrcodes__id'))
+        queryset = queryset.annotate(unit_name=F('unit__label'), barcode_first=F('barcodes__id'), qrcode_first=F('qrcodes__id'))
         columns = {
             'group':{'width':20},
             'id':{'width':10},
             'name':{'width':20},
             'article':{'width':20},
-            'unit_name':{'title':'unit'},
+            'unit_label':{'title':'unit'},
             'price':{},
             'cost':{},
             'barcode_first':{'width':20, 'title':'barcode'},
