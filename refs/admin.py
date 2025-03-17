@@ -406,6 +406,12 @@ class CustomModelAdmin(admin.ModelAdmin):
             msg += f'::{arg}'
         logging.warning(msg)
 
+    def logd(self, *args):
+        msg = f'⚠{self.__class__.__name__}.{sys._getframe().f_back.f_code.co_name}'
+        for arg in args:
+            msg += f'::{arg}'
+        logging.debug(msg)
+
     def loge(self, err, *args):
         msg = f'🆘{self.__class__.__name__}.{err.__traceback__.tb_frame.f_code.co_name}::{err}::LINE={err.__traceback__.tb_lineno}'
         for arg in args:
@@ -460,6 +466,8 @@ class CustomModelAdmin(admin.ModelAdmin):
             for item in queryset:
                 worksheet.set_row(row, None, cell_format_left)
                 col = 0
+                if settings.DEBUG:
+                    record = {}
                 for field_name in field_names:
                     if not hasattr(item, field_name):
                         col += 1
@@ -477,6 +485,8 @@ class CustomModelAdmin(admin.ModelAdmin):
                         col += 1
                         self.loge(e)
                     else:
+                        if settings.DEBUG:
+                            record[field_name] = value
                         if not value:
                             col += 1
                         else:
@@ -489,6 +499,8 @@ class CustomModelAdmin(admin.ModelAdmin):
                             elif not isinstance(value, str):
                                 value = f'{value}'
                             col = self.worksheet_cell_write(worksheet, row, col, value, tvalue, format_value)
+                if settings.DEBUG:
+                    self.logd('ROW', row, record)
                 row += 1
             workbook.close()
             output.seek(0)
@@ -1172,7 +1184,7 @@ class ProductAdmin(CustomModelAdmin):
     from_xls.short_description = f'⚔{_("load from XLS file")}'
 
     def to_xls(self, request, queryset):
-        queryset = queryset.annotate(unit_name=F('unit__label'), barcode_first=F('barcodes__id'), qrcode_first=F('qrcodes__id'))
+        queryset = queryset.annotate(unit_label=F('unit__label'), barcode_first=F('barcodes__id'), qrcode_first=F('qrcodes__id'))
         columns = {
             'group':{'width':20},
             'id':{'width':10},
