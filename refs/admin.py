@@ -722,7 +722,8 @@ admin.site.register(ProductGroup, ProductGroupAdmin)
 
 class ProductAdmin(CustomModelAdmin):
     __objs__ = {}
-    list_display = ('id', 'article', 'name', 'get_barcodes', 'get_qrcodes', 'get_cost', 'get_price', 'count', 'get_sum', 'get_tax', 'get_model', 'get_group', 'extinfo')
+    user = None
+    list_display = ['id', 'article', 'name', 'get_barcodes', 'get_qrcodes', 'get_price', 'count', 'get_sum', 'get_tax', 'get_model', 'get_group', 'extinfo']
     list_display_links = ('id', 'article', 'name')
     search_fields = ('name', 'article', 'extinfo', 'barcodes__id', 'qrcodes__id', 'group__name')
     list_select_related = ('tax', 'model', 'group')
@@ -733,7 +734,23 @@ class ProductAdmin(CustomModelAdmin):
     #class Media:
         #js = ['admin/js/autocomplete.js', 'admin/js/vendor/select2/select2.full.js']
 
+    def check_cost_permission(self):
+        if self.user.is_superuser:
+            return True
+        model_name = self.__class__.__name__.replace('Admin', '')
+        if get_model('users.RoleField').objects.filter(role=self.user.role, role_model__app='core', role_model__model=model_name, read=True, value='cost').exists():
+            return True
+        return False
+
     def changelist_view(self, request, extra_context=None):
+        self.user = request.user
+        if settings.DEBUG:
+            self.logd('CURRENT USER', self.user)
+        if self.check_cost_permission():
+            if 'get_cost' not in self.list_display:
+                self.list_display.insert(self.list_display.index('get_price'), 'get_cost')
+        elif 'get_cost' in self.list_display:
+            self.list_display.remove('get_cost')
         if 'action' in request.POST and request.POST['action'] in ['from_xls_with_check', 'from_xls', 'reset_cached']:
             if not request.POST.getlist(ACTION_CHECKBOX_NAME):
                 post = request.POST.copy()
@@ -742,6 +759,19 @@ class ProductAdmin(CustomModelAdmin):
                     post.update({ACTION_CHECKBOX_NAME: str(p.id)})
                 request._set_post(post)
         return super().changelist_view(request, extra_context)
+
+    def get_form(self, request, obj=None, **kwargs):
+        self.user = request.user
+        if settings.DEBUG:
+            self.logd('CURRENT USER', self.user)
+        if self.check_cost_permission():
+            if self.exclude:
+                self.exclude = ()
+        else:
+            self.exclude = ('cost', 'get_cost')
+        form = super().get_form(request, obj, **kwargs)
+        form.current_user = self.user
+        return form
 
     def get_last_reg(self, obj):
         if obj.id in self.__objs__ and 'lreg' in self.__objs__[obj.id]:
@@ -764,6 +794,8 @@ class ProductAdmin(CustomModelAdmin):
         return obj.price
 
     def get_cost(self, obj):
+        if not self.user.is_superuser and not get_model('users.RoleField').objects.filter(role=self.user.role, role_model__app='core', role_model__model=obj.__class__.__name__, read=True, value='cost').exists():
+            return ''
         value = obj.cost
         if settings.BEHAVIOR_COST.get('select_from_register', False):
             last_reg = self.get_last_reg(obj)
