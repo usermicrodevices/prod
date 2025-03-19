@@ -134,6 +134,12 @@ class CoreBaseAdmin():
             msg += f'::{arg}'
         logging.warning(msg)
 
+    def logd(self, *args):
+        msg = f'⚠{self.__class__.__name__}.{sys._getframe().f_back.f_code.co_name}'
+        for arg in args:
+            msg += f'::{arg}'
+        logging.debug(msg)
+
     def loge(self, err, *args):
         msg = f'🆘{self.__class__.__name__}.{err.__traceback__.tb_frame.f_code.co_name}::{err}::LINE={err.__traceback__.tb_lineno}'
         for arg in args:
@@ -248,13 +254,58 @@ class CustomModelAdmin(CoreBaseAdmin, admin.ModelAdmin):
 
 
 class RecordAdmin(CustomModelAdmin):
-    list_display = ('id', 'get_doc', 'product', 'get_cost', 'get_price', 'get_count', 'get_sum_cost', 'get_sum_price', 'extinfo')
+    user = None
+    list_display = ['id', 'get_doc', 'product', 'get_price', 'get_count', 'get_sum_price', 'extinfo']
     list_display_links = ('id',)
     search_fields = ('id', 'doc__owner__name', 'doc__contractor__name', 'doc__type__name', 'doc__tax__name', 'doc__sale_point__name', 'doc__author__username', 'extinfo')
     list_select_related = ('product', 'doc')
     autocomplete_fields = ('product', 'doc')
     list_filter = (ProductFilter, DocFilter, 'doc__type')
     list_editable = ['product']
+
+    def check_cost_permission(self):
+        if self.user.is_superuser:
+            return True
+        model_name = self.__class__.__name__.replace('Admin', '')
+        if get_model('users.RoleField').objects.filter(role=self.user.role, role_model__app='core', role_model__model=model_name, read=True, value='cost').exists():
+            return True
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        self.user = request.user
+        if settings.DEBUG:
+            self.logd('CURRENT USER', self.user)
+        if self.check_cost_permission():
+            if 'get_cost' not in self.list_display:
+                self.list_display.insert(self.list_display.index('get_price'), 'get_cost')
+            if 'get_sum_cost' not in self.list_display:
+                self.list_display.insert(self.list_display.index('get_sum_price'), 'get_sum_cost')
+        else:
+            if 'get_cost' in self.list_display:
+                self.list_display.remove('get_cost')
+            if 'get_sum_cost' in self.list_display:
+                self.list_display.remove('get_sum_cost')
+        if 'action' in request.POST and request.POST['action'] in ['from_xls_with_check', 'from_xls', 'reset_cached']:
+            if not request.POST.getlist(ACTION_CHECKBOX_NAME):
+                post = request.POST.copy()
+                p = Product.objects.first()
+                if p:
+                    post.update({ACTION_CHECKBOX_NAME: str(p.id)})
+                request._set_post(post)
+        return super().changelist_view(request, extra_context)
+
+    def get_form(self, request, obj=None, **kwargs):
+        self.user = request.user
+        if settings.DEBUG:
+            self.logd('CURRENT USER', self.user)
+        if self.check_cost_permission():
+            if self.exclude:
+                self.exclude = ()
+        else:
+            self.exclude = ('cost', 'get_cost')
+        form = super().get_form(request, obj, **kwargs)
+        form.current_user = self.user
+        return form
 
     def get_doc(self, obj):
         return format_html('<a href="{}/core/doc/?id={}" target="_blank">[{}] {} {}</a>', settings.ADMIN_PATH_PREFIX, obj.doc.id, obj.doc.id, obj.doc.type.name, obj.doc.registered_at.strftime('%Y-%m-%d %H:%M'))
@@ -271,7 +322,9 @@ class RecordAdmin(CustomModelAdmin):
     get_count.admin_order_field = 'count'
 
     def get_cost(self, obj):
-        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', obj.cost.quantize(Decimal('0.00')), obj.currency.name if obj.currency else '')
+        if self.check_cost_permission():
+            return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', obj.cost.quantize(Decimal('0.00')), obj.currency.name if obj.currency else '')
+        return ''
     get_cost.short_description = _('cost')
     get_cost.admin_order_field = 'cost'
 
@@ -281,8 +334,10 @@ class RecordAdmin(CustomModelAdmin):
     get_price.admin_order_field = 'price'
 
     def get_sum_cost(self, obj):
-        return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', (obj.cost*obj.count).quantize(Decimal('0.00')), obj.currency.name if obj.currency else '')
-    get_sum_cost.short_description = _('sum price')
+        if self.check_cost_permission():
+            return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', (obj.cost*obj.count).quantize(Decimal('0.00')), obj.currency.name if obj.currency else '')
+        return ''
+    get_sum_cost.short_description = _('sum cost')
 
     def get_sum_price(self, obj):
         return format_html('<font color="green" face="Verdana, Geneva, sans-serif">{} {}</font>', (obj.price*obj.count).quantize(Decimal('0.00')), obj.currency.name if obj.currency else '')
@@ -450,17 +505,19 @@ admin.site.autocomplete_view = autocomplete_view
 
 class RecordInlines(CustomTabularInline):
     model = Record
-    fields = ('product', 'count', 'cost', 'price')
+    fields = ['product', 'count', 'price']
     list_select_related = ('product',)
     autocomplete_fields = ('product',)
     extra = 0
 
 
 class DocAdmin(CustomModelAdmin):
-    list_display = ('id', 'get_reg', 'created_at', 'registered_at', 'type', 'contractor', 'customer', 'get_records', 'get_sum_cost', 'get_sum_price', 'sum_final', 'tax', 'owner', 'author', 'extinfo')
+    user = None
+    date_hierarchy = 'registered_at'
+    list_display = ['id', 'get_reg', 'created_at', 'registered_at', 'type', 'contractor', 'customer', 'get_records', 'get_sum_price', 'sum_final', 'tax', 'owner', 'author', 'extinfo']
     list_display_links = ('id', 'created_at', 'registered_at')
     search_fields = ('id', 'created_at', 'registered_at', 'owner__name', 'contractor__name', 'type__name', 'tax__name', 'sale_point__name', 'author__username', 'extinfo')
-    list_filter = (DocTypeFilter, ContractorCompanyFilter, OwnerCompanyFilter, ProductDocRecFilter, CustomerFilter)
+    list_filter = ('registered_at', 'created_at', DocTypeFilter, ContractorCompanyFilter, OwnerCompanyFilter, ProductDocRecFilter, CustomerFilter)
     actions = ('new_incoming_from_orders', 'registration', 'unregistration', 'recalculate_final_sum', 'order_to_xls', 'sales_receipt_to_printer')
     fieldsets = [
     (
@@ -483,11 +540,51 @@ class DocAdmin(CustomModelAdmin):
         #extend = False
         js = (JSProductRelationsSet(),)
 
-    # def formfield_for_dbfield(self, db_field, request, **kwargs):
-    #     if db_field.name == 'type':
-    #         widget = super().formfield_for_dbfield(db_field, request, **kwargs).widget
-    #         return db_field.formfield(widget=widget)
-    #     return super().formfield_for_dbfield(db_field, request, **kwargs)
+    def get_queryset(self, request):
+        self.user = request.user
+        if settings.DEBUG:
+            self.logd('CURRENT USER', self.user)
+        queryset = super().get_queryset(request)
+        if self.user.is_superuser:
+            return queryset
+        return queryset.filter(author=self.user)
+
+    def check_cost_permission(self):
+        if self.user.is_superuser:
+            return True
+        if get_model('users.RoleField').objects.filter(role=self.user.role, role_model__app='core', role_model__model='Record', read=True, value='cost').exists():
+            return True
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        self.user = request.user
+        if settings.DEBUG:
+            self.logd('CURRENT USER', self.user)
+        if self.check_cost_permission():
+            if 'get_sum_cost' not in self.list_display:
+                self.list_display.insert(self.list_display.index('get_sum_price'), 'get_sum_cost')
+        else:
+            if 'get_sum_cost' in self.list_display:
+                self.list_display.remove('get_sum_cost')
+        if 'action' in request.POST and request.POST['action'] in ['from_xls_with_check', 'from_xls', 'reset_cached']:
+            if not request.POST.getlist(ACTION_CHECKBOX_NAME):
+                post = request.POST.copy()
+                p = Product.objects.first()
+                if p:
+                    post.update({ACTION_CHECKBOX_NAME: str(p.id)})
+                request._set_post(post)
+        return super().changelist_view(request, extra_context)
+
+    def get_form(self, request, obj, **kwargs):
+        self.user = request.user
+        if settings.DEBUG:
+            self.logd('CURRENT USER', self.user)
+        if self.check_cost_permission():
+            if 'cost' not in self.inlines[0].fields:
+                self.inlines[0].fields.insert(self.inlines[0].fields.index('price'), 'cost')
+        elif 'cost' in self.inlines[0].fields:
+            self.inlines[0].fields.remove('cost')
+        return super().get_form(request, obj, **kwargs)
 
     def save_model(self, request, instance, form, change):
         current_user = request.user
