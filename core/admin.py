@@ -536,9 +536,17 @@ class DocAdmin(CustomModelAdmin):
     list_editable = ['type']
     autocomplete_fields = ['type']
 
+    #formfield_overrides = {CharField: {'widget': forms.Select(attrs={'size': '20'})}}
+
     class Media:
         #extend = False
         js = (JSProductRelationsSet(),)
+
+    def formfield_for_dbfield(self, db_field, **kwargs):
+        field = super().formfield_for_dbfield(db_field, **kwargs)
+        if db_field.name == 'type':
+            field.widget.attrs['style'] = 'width: 10em;'
+        return field
 
     def get_queryset(self, request):
         self.user = request.user
@@ -584,6 +592,9 @@ class DocAdmin(CustomModelAdmin):
                 self.inlines[0].fields.insert(self.inlines[0].fields.index('price'), 'cost')
         elif 'cost' in self.inlines[0].fields:
             self.inlines[0].fields.remove('cost')
+        # form = super().get_form(request, obj, **kwargs)
+        # form.base_fields['type'].widget.attrs['style'] = 'width: 10em;'
+        # return form
         return super().get_form(request, obj, **kwargs)
 
     def save_model(self, request, instance, form, change):
