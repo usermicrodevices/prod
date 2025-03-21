@@ -112,7 +112,8 @@ class Usr(TransactionTestCase):
         print('Response♡', response, response.headers)
         print('DATA⋆', eval(json.loads(response.content)))
         print()
-        url = f'/api/product/1/'
+        prod_id = get_model('refs.Product').objects.first().id
+        url = f'/api/product/{prod_id}/'
         print('⚽GET', url)
         response = self.client.get(url, headers={'X-CSRFToken':self.csrfmiddlewaretoken})
         #self.assertEqual(response.status_code, 200)
@@ -120,7 +121,7 @@ class Usr(TransactionTestCase):
         print('Response♡', response, response.headers)
         print('DATA⋆', eval(json.loads(response.content).replace('null', 'None')))
         print()
-        url = f'/api/product/1/'
+        url = f'/api/product/{prod_id}/'
         print('⚽HEAD', url)
         response = self.client.head(url, headers={'X-CSRFToken':self.csrfmiddlewaretoken})
         #self.assertEqual(response.status_code, 200)
@@ -140,6 +141,25 @@ class Usr(TransactionTestCase):
         url = '/api/doc/cash/'
         prods = get_model('refs.Product').objects.all()[:5]
         data = json.dumps({'sum_final':1000, 'registered_at':datetime.now().astimezone().strftime('%Y-%m-%dT%H:%M:%S %z'), 'records':[{'product':p.id, 'count':10, 'price':f'{p.price}'} for p in prods]})
+        print('⚽POST', url, data)
+        response = self.client.post(url, data, 'json', headers={'X-CSRFToken':self.csrfmiddlewaretoken})
+        print('CONTENT♡', response.content)
+        self.assertEqual(response.status_code, 200)
+        print('Request♥', response.request)
+        print('Response♡', response, response.headers)
+        print('DATA⋆', json.loads(response.content))
+
+    def test_customers(self):
+        print()
+        url = '/api/customers/'
+        print('⚽GET', url)
+        response = self.client.get(url, headers={'X-CSRFToken':self.csrfmiddlewaretoken})
+        self.assertEqual(response.status_code, 200)
+        print('Request♥', response.request)
+        print('Response♡', response, response.headers)
+        print('DATA⋆', eval(json.loads(response.content.decode('utf8').replace('null', 'None'))))
+        print()
+        data = json.dumps([{'name':'John Doe', 'extinfo':{'test':'key'}}, {'name':'Test Name', 'extinfo':{'key':'value'}}])
         print('⚽POST', url, data)
         response = self.client.post(url, data, 'json', headers={'X-CSRFToken':self.csrfmiddlewaretoken})
         print('CONTENT♡', response.content)

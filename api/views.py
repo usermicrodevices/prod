@@ -18,7 +18,7 @@ from django.utils.dateparse import parse_datetime
 from django.shortcuts import get_object_or_404
 
 from users.models import User, RoleField
-from refs.models import Company, DocType, Product
+from refs.models import Company, Customer, DocType, Product
 from core.models import Doc, Record, Register
 
 
@@ -301,21 +301,70 @@ class DocCashAddView(View, LogMixin):
 
 
 class DocsView(ListView, LogMixin):
-    paginate_by = 10
+    limit_default = 10
+    page_num_default = 1
     model = Doc
     context_object_name = 'docs'
     queryset = model.objects.none()
 
     @method_decorator([ensure_csrf_cookie])
     def get(self, request, *args, **kwargs):
+        request.GET._mutable = True
+        page_num = int(request.GET.pop('page', [self.page_num_default])[0])
+        limit = int(request.GET.pop('limit', [self.limit_default])[0])
         if request.GET:
             self.queryset = self.queryset.filter(**request.GET)
-        paginator = Paginator(self.queryset, self.paginate_by)
-        page_number = request.GET.get('page')
-        page_obj = paginator.get_page(page_number)
+        paginator = Paginator(self.queryset, self.limit_default)
+        page_obj = paginator.get_page(page_num)
         if settings.DEBUG:
             self.logd(page_obj.object_list)
         json_data = serialize('json', page_obj, fields=('id', 'created_at', 'registered_at', 'owner', 'contractor', 'customer', 'type', 'tax', 'sale_point', 'sum_final', 'author'))
         if settings.DEBUG:
             self.logd(json_data)
-        return JsonResponse(json_data, safe=False)
+        rsp_hdrs = {'count':paginator.count, 'num_pages':paginator.num_pages, 'page_min':paginator.page_range.start, 'page_max':paginator.page_range.stop, 'page':page_num, 'limit':limit}
+        return JsonResponse(json_data, safe=False, headers=rsp_hdrs)
+
+
+class CustomersView(ListView, LogMixin):
+    limit_default = 10
+    page_num_default = 1
+    model = Customer
+    queryset = model.objects.all()
+
+    @method_decorator([ensure_csrf_cookie])
+    def get(self, request, *args, **kwargs):
+        request.GET._mutable = True
+        page_num = int(request.GET.pop('page', [self.page_num_default])[0])
+        limit = int(request.GET.pop('limit', [self.limit_default])[0])
+        if request.GET:
+            self.queryset = self.queryset.filter(**request.GET)
+        paginator = Paginator(self.queryset, self.limit_default)
+        page_obj = paginator.get_page(page_num)
+        if settings.DEBUG:
+            self.logd(page_obj.object_list)
+        json_data = serialize('json', page_obj, fields=('id', 'name', 'extinfo'))
+        if settings.DEBUG:
+            self.logd(json_data)
+        rsp_hdrs = {'count':paginator.count, 'num_pages':paginator.num_pages, 'page_min':paginator.page_range.start, 'page_max':paginator.page_range.stop, 'page':page_num, 'limit':limit}
+        return JsonResponse(json_data, safe=False, headers=rsp_hdrs)
+
+    @method_decorator([ensure_csrf_cookie])
+    def post(self, request, *args, **kwargs):
+        try:
+            items = json.loads(request.body)
+        except json.decoder.JSONDecodeError as e:
+            self.loge(e)
+            return JsonResponse({'result':f'error: {e}'}, status=400)
+        except Exception as e:
+            self.loge(e)
+            return JsonResponse({'result':f'error: {e}'}, status=500)
+        new_items = []
+        for it in items:
+            if it and isinstance(it, dict):
+                new_items.append(Customer(**it))
+        if new_items:
+            try:
+                objs = Customer.objects.bulk_create(new_items)
+            except Exception as e:
+                return JsonResponse({'result':f'error: {e}'}, status=500)
+        return JsonResponse({'result':'success'}, safe=False)
