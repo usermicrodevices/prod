@@ -625,3 +625,15 @@ msgstr "изменено"
 
 msgid "change units"
 msgstr "поменять единицы измерения"
+
+msgid "not permission for this operation"
+msgstr "недостаточно прав для этой операции"
+
+msgid "please select barcodes"
+msgstr "пожалуйста выберите штрихкоды"
+
+msgid "delete barcodes"
+msgstr "удалены штрихкоды"
+
+msgid "delete all without products"
+msgstr "удалить все без товаров"
