@@ -285,13 +285,7 @@ class RecordAdmin(CustomModelAdmin):
                 self.list_display.remove('get_cost')
             if 'get_sum_cost' in self.list_display:
                 self.list_display.remove('get_sum_cost')
-        if 'action' in request.POST and request.POST['action'] in ['from_xls_with_check', 'from_xls', 'reset_cached']:
-            if not request.POST.getlist(ACTION_CHECKBOX_NAME):
-                post = request.POST.copy()
-                p = Product.objects.first()
-                if p:
-                    post.update({ACTION_CHECKBOX_NAME: str(p.id)})
-                request._set_post(post)
+        #request = self.noselect_actions(request, [])
         return super().changelist_view(request, extra_context)
 
     def get_form(self, request, obj=None, **kwargs):
@@ -347,12 +341,36 @@ admin.site.register(Record, RecordAdmin)
 
 
 class RegisterAdmin(CustomModelAdmin):
-    list_display = ('id', 'rec', 'get_doc', 'get_product', 'get_cost', 'get_price', 'get_count', 'get_sum_cost', 'get_sum_price')
-    list_display_links = ('id',)
+    list_display = ['id', 'rec', 'get_doc', 'get_product', 'get_price', 'get_count', 'get_sum_price']
+    list_display_links = ['id']
     search_fields = ('id', 'rec__doc__owner__name', 'rec__doc__contractor__name', 'rec__doc__type__name')
     list_filter = (ProductRecordFilter, DocRecordFilter, 'rec__doc__type')
     list_editable = ['rec']
     autocomplete_fields = ['rec']
+
+    def check_cost_permission(self):
+        if self.user.is_superuser:
+            return True
+        if get_model('users.RoleField').objects.filter(role=self.user.role, role_model__app='core', role_model__model='Record', read=True, value='cost').exists():
+            return True
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        self.user = request.user
+        if settings.DEBUG:
+            self.logd('CURRENT USER', self.user)
+        if self.check_cost_permission():
+            if 'get_cost' not in self.list_display:
+                self.list_display.insert(self.list_display.index('get_price'), 'get_cost')
+            if 'get_sum_cost' not in self.list_display:
+                self.list_display.insert(self.list_display.index('get_sum_price'), 'get_sum_cost')
+        else:
+            if 'get_cost' in self.list_display:
+                self.list_display.remove('get_cost')
+            if 'get_sum_cost' in self.list_display:
+                self.list_display.remove('get_sum_cost')
+        #request = self.noselect_actions(request, [])
+        return super().changelist_view(request, extra_context)
 
     def rec(self, obj):
         return format_html('<a href="{}/core/record/?id={}" target="_blank">R{}</a>', settings.ADMIN_PATH_PREFIX, obj.rec.id, obj.rec.id)
@@ -574,13 +592,7 @@ class DocAdmin(CustomModelAdmin):
         else:
             if 'get_sum_cost' in self.list_display:
                 self.list_display.remove('get_sum_cost')
-        if 'action' in request.POST and request.POST['action'] in ['from_xls_with_check', 'from_xls', 'reset_cached']:
-            if not request.POST.getlist(ACTION_CHECKBOX_NAME):
-                post = request.POST.copy()
-                p = Product.objects.first()
-                if p:
-                    post.update({ACTION_CHECKBOX_NAME: str(p.id)})
-                request._set_post(post)
+        #request = self.noselect_actions(request, [])
         return super().changelist_view(request, extra_context)
 
     def get_form(self, request, obj, **kwargs):
@@ -675,7 +687,8 @@ class DocAdmin(CustomModelAdmin):
         updated_count = 0
         for it in queryset.filter(type_id__in=get_model('refs.DocType').objects.filter(auto_register=True).values('id')):
             records_queryset = Record.objects.filter(doc=it)
-            if records_queryset.count() == Register.objects.filter(rec__in=records_queryset.values_list('id', flat=True)).delete():
+            count_delete, del_refs = Register.objects.filter(rec__in=records_queryset.values_list('id', flat=True)).delete()
+            if records_queryset.count() == count_delete:
                 updated_count += 1
         self.message_user(request, f'{_("updated")} {updated_count} ☑', messages.SUCCESS)
     unregistration.short_description = f'❌ {_("cancel registration")} 👌'

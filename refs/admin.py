@@ -418,6 +418,17 @@ class CustomModelAdmin(admin.ModelAdmin):
             msg += f'::{arg}'
         logging.error(msg)
 
+    def noselect_actions(self, request, auto_selectable_actions=[]):
+        if 'action' in request.POST and request.POST['action'] in auto_selectable_actions:
+            if not request.POST.getlist(ACTION_CHECKBOX_NAME):
+                post = request.POST.copy()
+                # p = self.model.objects.first()
+                # if p:
+                #     post.update({ACTION_CHECKBOX_NAME: str(p.id)})
+                post.update({ACTION_CHECKBOX_NAME:'0'})
+                request._set_post(post)
+        return request
+
     def worksheet_cell_write(self, worksheet, row, col, value, type_value = None, fmt = None):
         func_write = worksheet.write
         if type_value == 'as_number':
@@ -665,7 +676,11 @@ class BarCodeAdmin(CustomModelAdmin):
     list_display = ('id', 'get_products')
     list_display_links = ['id']
     search_fields = ['id']
-    actions = ('fix_code',)
+    actions = ('fix_code', 'delete_ghosts')
+
+    def changelist_view(self, request, extra_context=None):
+        request = self.noselect_actions(request, ['delete_ghosts'])
+        return super().changelist_view(request, extra_context)
 
     def get_products(self, obj):
         try:
@@ -701,6 +716,28 @@ class BarCodeAdmin(CustomModelAdmin):
                         p.barcodes.add(bcode)
         self.message_user(request, f"{_(f'fixed')} {replaced}", messages.SUCCESS)
     fix_code.short_description = f'✨{_("fix values")}🖋'
+
+    def delete_ghosts(self, request, queryset):
+        if not request.user.is_superuser and not request.user.has_perm('refs.delete_barcode'):
+            self.message_user(request, _('not permission for this operation'), messages.WARNING)
+        else:
+            selected = queryset.count()
+            if not selected:
+                queryset = self.model.objects.all()
+                selected = queryset.count()
+            if settings.DEBUG:
+                self.logd('SELECTED-COUNT', selected)
+            if not selected:
+                self.message_user(request, _('please select barcodes'), messages.WARNING)
+            else:
+                try:
+                    count_delete, del_refs = queryset.filter(product__isnull=True).delete()
+                except Exception as e:
+                    self.loge(e)
+                    self.message_user(request, f'{e}', messages.ERROR)
+                else:
+                    self.message_user(request, f'{_("delete barcodes")} {count_delete} {del_refs}', messages.SUCCESS)
+    delete_ghosts.short_description = f'𝔻𝓓🇩{_("delete all without products")}𝕯Ⓓ𝐃'
 
 admin.site.register(BarCode, BarCodeAdmin)
 
@@ -751,13 +788,7 @@ class ProductAdmin(CustomModelAdmin):
                 self.list_display.insert(self.list_display.index('get_price'), 'get_cost')
         elif 'get_cost' in self.list_display:
             self.list_display.remove('get_cost')
-        if 'action' in request.POST and request.POST['action'] in ['from_xls_with_check', 'from_xls', 'reset_cached']:
-            if not request.POST.getlist(ACTION_CHECKBOX_NAME):
-                post = request.POST.copy()
-                p = Product.objects.first()
-                if p:
-                    post.update({ACTION_CHECKBOX_NAME: str(p.id)})
-                request._set_post(post)
+        request = self.noselect_actions(request, ['from_xls_with_check', 'from_xls', 'reset_cached'])
         return super().changelist_view(request, extra_context)
 
     def get_form(self, request, obj=None, **kwargs):
@@ -1333,7 +1364,7 @@ class ProductAdmin(CustomModelAdmin):
             except Exception as e:
                 self.loge(e)
             else:
-                m = f'DELETED {dresult}'
+                m = f'{_("delete barcodes")} {dresult}'
                 if settings.DEBUG:
                     self.logi(m)
                 msg += f'; {m}'
