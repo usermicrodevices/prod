@@ -242,10 +242,10 @@ class DocCashAddView(View, LogMixin):
         except Exception as e:
             self.loge(e)
             return JsonResponse({'result':f'error: {e}'}, status=500)
-        sum_final = data.get('sum_final', 0)
+        sum_final = data.get('sum_final', None)
         records = data.get('records', [])
         registered_at = data.get('registered_at', '')
-        if records and sum_final and registered_at:
+        if sum_final is not None and records and registered_at:
             id_owner = data.get('owner', request.user.default_company.id if request.user.default_company else 1)
             default_contractor = Company.objects.filter(extinfo__default_cash_contractor=True).first()
             if not default_contractor and request.user.companies.count():
@@ -297,6 +297,8 @@ class DocCashAddView(View, LogMixin):
                                     except Exception as e:
                                         self.loge(e, reg)
                     return JsonResponse({'result':'success', 'doc':f'{doc.id}', 'records_count':len(obj_recs)})
+        if settings.DEBUG:
+            self.logd(data)
         return JsonResponse({'result':'error; request data invalid'}, status=400)
 
 

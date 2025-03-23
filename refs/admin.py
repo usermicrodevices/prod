@@ -766,7 +766,7 @@ class ProductAdmin(CustomModelAdmin):
     list_select_related = ('tax', 'model', 'group')
     list_filter = (ProductGroupFilter, ProductManufacturerFilter, ProductModelFilter, TaxFilter)
     autocomplete_fields = ('tax', 'model', 'group', 'barcodes', 'qrcodes')
-    actions = ('from_xls_with_check', 'from_xls', 'to_xls', 'price_to_xls', 'barcode_to_svg', 'fix_barcodes', 'change_units', 'reset_cached')
+    actions = ('from_xls_with_check', 'from_xls', 'to_xls', 'price_to_xls', 'barcode_to_svg', 'fix_barcodes', 'copy_unit', 'copy_cost', 'copy_price', 'copy_cost_price', 'reset_cached')
 
     #class Media:
         #js = ['admin/js/autocomplete.js', 'admin/js/vendor/select2/select2.full.js']
@@ -1371,11 +1371,37 @@ class ProductAdmin(CustomModelAdmin):
         self.message_user(request, msg, messages.SUCCESS)
     fix_barcodes.short_description = f'Ⅲ🔨 {_("fix barcodes")} 🔧'
 
-    def change_units(self, request, queryset):
-        it_first = queryset.first()
-        changed = queryset.exclude(unit_id=it_first.unit_id).update(unit_id=it_first.unit_id)
-        self.message_user(request, f'{_("changed")} {changed}', messages.SUCCESS)
-    change_units.short_description = f'🆔 {_("change units")} 🆗'
+    def copy_unit(self, request, queryset):
+        changed = 0
+        if queryset.count() > 1:
+            it_first = queryset.first()
+            changed = queryset.exclude(unit_id=it_first.unit_id).update(unit_id=it_first.unit_id)
+        self.message_user(request, f'{_("copied")} {changed}', messages.SUCCESS)
+    copy_unit.short_description = f'🆔 {_("copy unit")} 🆗'
+
+    def copy_cost(self, request, queryset):
+        changed = 0
+        if queryset.count() > 1:
+            it_first = queryset.first()
+            changed = queryset.exclude(cost=it_first.cost).update(cost=it_first.cost)
+        self.message_user(request, f'{_("copied")} {changed}', messages.SUCCESS)
+    copy_cost.short_description = f'💲 {_("copy cost")} ₿'
+
+    def copy_price(self, request, queryset):
+        changed = 0
+        if queryset.count() > 1:
+            it_first = queryset.first()
+            changed = queryset.exclude(price=it_first.price).update(price=it_first.price)
+        self.message_user(request, f'{_("copied")} {changed}', messages.SUCCESS)
+    copy_price.short_description = f'💰 {_("copy price")} ₿'
+
+    def copy_cost_price(self, request, queryset):
+        changed = 0
+        if queryset.count() > 1:
+            it_first = queryset.first()
+            changed = queryset.exclude(cost=it_first.cost, price=it_first.price).update(cost=it_first.cost, price=it_first.price)
+        self.message_user(request, f'{_("copied")} {changed}', messages.SUCCESS)
+    copy_cost_price.short_description = f'🪙 {_("copy cost and price")} ₿💲💰'
 
 admin.site.register(Product, ProductAdmin)
 

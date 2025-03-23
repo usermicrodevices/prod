@@ -620,11 +620,20 @@ msgstr "Покупатели"
 msgid "customer of document"
 msgstr "покупатель в документе"
 
-msgid "changed"
-msgstr "изменено"
+msgid "copied"
+msgstr "скопировано"
 
-msgid "change units"
-msgstr "поменять единицы измерения"
+msgid "copy unit"
+msgstr "копировать единицу измерения"
+
+msgid "copy cost"
+msgstr "копировать цену закупки"
+
+msgid "copy price"
+msgstr "копировать цену продажи"
+
+msgid "copy cost and price"
+msgstr "копировать цены закупки и продажи"
 
 msgid "not permission for this operation"
 msgstr "недостаточно прав для этой операции"
