@@ -141,14 +141,6 @@ LOGGING = {
         },
     },
     'handlers': {
-        'file': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': 'logs/shop.log',
-            'formatter': 'verbose',
-            'backupCount': 31,
-            'when': 'midnight'
-        },
         'console': {
             'level': 'DEBUG',
             'class': 'logging.StreamHandler',
@@ -158,7 +150,7 @@ LOGGING = {
     },
     'loggers': {
         '': {
-            'handlers': ['file', 'console'],
+            'handlers': ['console'],
             'level': 'DEBUG'
         }
     }
