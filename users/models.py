@@ -215,7 +215,10 @@ class User(AbstractUser, BaseModelWithLogger):
     def to_dict(self, exclude_fields='__all__'):
         data = super().to_dict(exclude_fields)
         if 'role' in data:
-            data['role'] = self.role.to_dict()
+            if self.role:
+                data['role'] = self.role.to_dict()
+            else:
+                data['role'] = {}
         if 'user_permissions' in data:
             data['user_permissions'] = [x.codename for x in Permission.objects.filter(user=self)]
         if 'groups' in data:
