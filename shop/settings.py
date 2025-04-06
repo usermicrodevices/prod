@@ -72,6 +72,10 @@ TEMPLATES = [
 WSGI_APPLICATION = 'shop.wsgi.application'
 
 DATABASES = {
+    'testdb': {
+        "ENGINE": "django.db.backends.sqlite3",
+        'NAME': ':memory:'
+    },
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'prod_database',
@@ -79,7 +83,7 @@ DATABASES = {
         'PASSWORD': '',
         'HOST': '127.0.0.1',
         'PORT': '5432',
-        'TEST':{'MIRROR':'default'}
+        'TEST':{'MIRROR':'testdb'}
     }
 }
 
