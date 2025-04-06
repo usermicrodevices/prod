@@ -23,16 +23,18 @@ def post_init_app():
         if settings.DEBUG:
             logging.debug('{} - MODELS = {}'.format(sys._getframe().f_code.co_name, models))
         for _, model_class in models:
-            if model_class.__name__ not in exclude_classes and model_class.__module__ in ['refs.models', 'core.models'] and 'CacheManager' not in model_class.__name__:
+            model_name = model_class.__name__
+            if model_name not in exclude_classes and model_class.__module__ in ['refs.models', 'core.models'] and 'CacheManager' not in model_name:
+                app_name = model_class.__module__.split('.')[0]
                 try:
-                    rmodel = get_model('users.RoleModel').objects.get(app = model_class.__module__.split('.')[0], model = model_class.__name__)
+                    rmodel = get_model('users.RoleModel').objects.get(app=app_name, model=model_name)
                 except:
                     try:
-                        logging.info('{} :: PRINT CLASS NAME {}.{}'.format(sys._getframe().f_code.co_name, model_class.__module__, model_class.__name__))
+                        logging.info('{} :: PRINT CLASS NAME {}.{}'.format(sys._getframe().f_code.co_name, model_class.__module__, model_name))
                     except Exception as e:
                         logging.warning('{} :: {} : {}'.format(sys._getframe().f_code.co_name, model_class, e))
                     try:
-                        rmodel = get_model('users.RoleModel')(app = model_class.__module__.split('.')[0], model = model_class.__name__)
+                        rmodel = get_model('users.RoleModel')(app=app_name, model=model_name)
                     except Exception as e:
                         logging.error('{} :: {} : {}'.format(sys._getframe().f_code.co_name, model_class, e))
                     else:
