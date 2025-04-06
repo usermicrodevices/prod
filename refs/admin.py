@@ -6,7 +6,6 @@ try:
     from zoneinfo import available_timezones, ZoneInfo
 except:
     from backports.zoneinfo import available_timezones, ZoneInfo
-from uuid import uuid4
 
 from django.utils import timezone as django_timezone
 from django.utils.translation import gettext as _
