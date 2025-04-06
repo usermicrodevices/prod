@@ -58,32 +58,45 @@ class CustomAbstractModel(models.Model):
         opts = self._meta
         return [f.name for f in chain(opts.concrete_fields, opts.private_fields)]
 
-    def to_list(self):
-        opts = self._meta
+    def to_list(self, exclude_fields='__all__'):
         data = []
+        if isinstance(exclude_fields, str) and  exclude_fields == '__all__':
+            return data
+        opts = self._meta
         for f in chain(opts.concrete_fields, opts.private_fields):
+            if f.name in exclude_fields:
+                continue
             value = f.value_from_object(self)
             data.append(value)
         return data
 
-    def to_list_strings(self):
-        opts = self._meta
+    def to_list_strings(self, exclude_fields='__all__'):
         data = []
+        if isinstance(exclude_fields, str) and  exclude_fields == '__all__':
+            return data
+        opts = self._meta
         for f in chain(opts.concrete_fields, opts.private_fields):
+            if f.name in exclude_fields:
+                continue
             value = f.value_from_object(self)
             if value is None:
                 value = ''
             data.append(value if isinstance(value, str) else f'{value}')
         return data
 
-    def to_dict(self):
-        opts = self._meta
+    def to_dict(self, exclude_fields='__all__'):
         data = {}
+        if isinstance(exclude_fields, str) and  exclude_fields == '__all__':
+            return data
+        opts = self._meta
         for f in chain(opts.concrete_fields, opts.private_fields):
+            if f.name in exclude_fields:
+                continue
             value = f.value_from_object(self)
-            if value:
-                data[f.name] = value if isinstance(value, str) else f'{value}'
+            data[f.name] = value if isinstance(value, str) else f'{value}'
         for f in opts.many_to_many:
+            if f.name in exclude_fields:
+                continue
             data[f.name] = [i.id for i in f.value_from_object(self)]
         return data
 

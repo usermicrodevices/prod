@@ -68,7 +68,7 @@ class Usr(TransactionTestCase):
         print(self.client.cookies)
         print('Request♥', response.request)
         print('Response♡', json.dumps(response.json(), ensure_ascii=False).encode('utf-8'))
-        print(response.content)
+        print('DATA⋆', eval(response.content))
 
     def test_products(self):
         print()
@@ -78,7 +78,7 @@ class Usr(TransactionTestCase):
         self.assertEqual(response.status_code, 200)
         print('Request♥', response.request)
         print('Response♡', response, response.headers)
-        print('DATA⋆', eval(json.loads(response.content)))
+        print('DATA⋆', eval(response.content))
         print()
         url = '/api/products/cash/'
         print('⚽GET', url)
@@ -86,7 +86,7 @@ class Usr(TransactionTestCase):
         self.assertEqual(response.status_code, 200)
         print('Request♥', response.request)
         print('Response♡', response, response.headers)
-        print('DATA⋆', eval(json.loads(response.content)))
+        print('DATA⋆', eval(response.content))
         print()
         url = '/api/products/?page=1'
         print('⚽GET', url)
@@ -94,7 +94,7 @@ class Usr(TransactionTestCase):
         self.assertEqual(response.status_code, 200)
         print('Request♥', response.request)
         print('Response♡', response, response.headers)
-        print('DATA⋆', eval(json.loads(response.content)))
+        print('DATA⋆', eval(response.content))
         print()
         url = '/api/products/?page=0'
         print('⚽GET', url)
@@ -102,7 +102,7 @@ class Usr(TransactionTestCase):
         self.assertEqual(response.status_code, 400)
         print('Request♥', response.request)
         print('Response♡', response, response.headers)
-        print('DATA⋆', eval(json.loads(response.content)))
+        print('DATA⋆', eval(response.content))
         print()
         url = f'/api/products/?page={int(response.headers['page_max']) + 1}'
         print('⚽GET', url)
@@ -110,7 +110,7 @@ class Usr(TransactionTestCase):
         self.assertEqual(response.status_code, 400)
         print('Request♥', response.request)
         print('Response♡', response, response.headers)
-        print('DATA⋆', eval(json.loads(response.content)))
+        print('DATA⋆', eval(response.content))
         print()
         prod_id = get_model('refs.Product').objects.first().id
         url = f'/api/product/{prod_id}/'
@@ -119,7 +119,7 @@ class Usr(TransactionTestCase):
         #self.assertEqual(response.status_code, 200)
         print('Request♥', response.request)
         print('Response♡', response, response.headers)
-        print('DATA⋆', eval(json.loads(response.content).replace('null', 'None')))
+        print('DATA⋆', eval(response.content.decode('utf8').replace('null', 'None')))
         print()
         url = f'/api/product/{prod_id}/'
         print('⚽HEAD', url)
@@ -136,7 +136,7 @@ class Usr(TransactionTestCase):
         self.assertEqual(response.status_code, 200)
         print('Request♥', response.request)
         print('Response♡', response, response.headers)
-        print('DATA⋆', eval(json.loads(response.content.decode('utf8').replace('null', 'None'))))
+        print('DATA⋆', eval(response.content.decode('utf8').replace('null', 'None')))
         print()
         url = '/api/doc/cash/'
         prods = get_model('refs.Product').objects.all()[:5]
@@ -147,7 +147,7 @@ class Usr(TransactionTestCase):
         self.assertEqual(response.status_code, 200)
         print('Request♥', response.request)
         print('Response♡', response, response.headers)
-        print('DATA⋆', json.loads(response.content))
+        print('DATA⋆', eval(response.content))
 
     def test_customers(self):
         print()
@@ -157,7 +157,7 @@ class Usr(TransactionTestCase):
         self.assertEqual(response.status_code, 200)
         print('Request♥', response.request)
         print('Response♡', response, response.headers)
-        print('DATA⋆', eval(json.loads(response.content.decode('utf8').replace('null', 'None'))))
+        print('DATA⋆', eval(response.content.decode('utf8').replace('null', 'None')))
         print()
         data = json.dumps([{'name':'John Doe', 'extinfo':{'test':'key'}}, {'name':'Test Name', 'extinfo':{'key':'value'}}])
         print('⚽POST', url, data)
@@ -166,4 +166,4 @@ class Usr(TransactionTestCase):
         self.assertEqual(response.status_code, 200)
         print('Request♥', response.request)
         print('Response♡', response, response.headers)
-        print('DATA⋆', json.loads(response.content))
+        print('DATA⋆', eval(response.content))

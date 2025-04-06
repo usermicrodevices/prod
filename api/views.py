@@ -39,12 +39,13 @@ def url_login(request):
             except (json.decoder.JSONDecodeError, Exception) as e:
                 logging.error(e)
                 return JsonResponse({'result':'error: unknown data'}, status=400)
+            exclude_flds = ['id', 'username', 'password']
             user_name = data.get('username', '')
             user_password = data.get('password', '')
             user = authenticate(request, username=user_name, password=user_password)
             if user:
                 login(request, user)
-                return JsonResponse({'result':'success'})
+                return JsonResponse({'result':'success', 'user':user.to_dict(exclude_flds)})
             else:
                 try:
                     u = User.objects.get(username=user_name)
@@ -57,7 +58,7 @@ def url_login(request):
                         request.session[BACKEND_SESSION_KEY] = settings.AUTHENTICATION_BACKENDS[0]
                         request.session[HASH_SESSION_KEY] = u.get_session_auth_hash()
                         #request.session[HASH_SESSION_KEY] = Signer().sign_object(data)
-                        return JsonResponse({'result':'success'})
+                        return JsonResponse({'result':'success', 'user':user.to_dict(exclude_flds)})
             return JsonResponse({'result':"error: Your username and password didn't match."}, status=403)
         else:
             return JsonResponse({'result':'error: Please enable cookies and try again.'}, status=401)

@@ -1,10 +1,10 @@
 import logging, sys
+from itertools import chain
 
 from django.core.cache import caches
 from django.db import models, transaction
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.utils.translation import gettext_lazy as _
-from django.contrib.auth.models import Group
 from django.apps import apps as django_apps
 from django.dispatch import receiver
 from django.db.models.signals import post_save
@@ -63,6 +63,12 @@ class BaseModelWithLogger:
         for arg in args: msg += f'::{arg}'
         logging.info(msg)
 
+    def logd(self, *args):
+        msg = f'❕{self.__class__.__name__}.{sys._getframe().f_back.f_code.co_name}'
+        for arg in args:
+            msg += f'::{arg}'
+        logging.debug(msg)
+
     def logw(self, *args):
         msg = f'{self.__class__.__name__}.{sys._getframe().f_back.f_code.co_name}'
         for arg in args: msg += f'::{arg}'
@@ -72,6 +78,48 @@ class BaseModelWithLogger:
         msg = f'{self.__class__.__name__}.{err.__traceback__.tb_frame.f_code.co_name}::{err}::LINE={err.__traceback__.tb_lineno}'
         for arg in args: msg += f'::{arg}'
         logging.error(msg)
+
+    def to_list(self, exclude_fields='__all__'):
+        data = []
+        if isinstance(exclude_fields, str) and  exclude_fields == '__all__':
+            return data
+        opts = self._meta
+        for f in chain(opts.concrete_fields, opts.private_fields):
+            if f.name in exclude_fields:
+                continue
+            value = f.value_from_object(self)
+            data.append(value)
+        return data
+
+    def to_list_strings(self, exclude_fields='__all__'):
+        data = []
+        if isinstance(exclude_fields, str) and  exclude_fields == '__all__':
+            return data
+        opts = self._meta
+        for f in chain(opts.concrete_fields, opts.private_fields):
+            if f.name in exclude_fields:
+                continue
+            value = f.value_from_object(self)
+            if value is None:
+                value = ''
+            data.append(value if isinstance(value, str) else f'{value}')
+        return data
+
+    def to_dict(self, exclude_fields='__all__'):
+        data = {}
+        if isinstance(exclude_fields, str) and  exclude_fields == '__all__':
+            return data
+        opts = self._meta
+        for f in chain(opts.concrete_fields, opts.private_fields):
+            if f.name in exclude_fields:
+                continue
+            value = f.value_from_object(self)
+            data[f.name] = value if isinstance(value, str) else f'{value}'
+        for f in opts.many_to_many:
+            if f.name in exclude_fields:
+                continue
+            data[f.name] = [i.id for i in f.value_from_object(self)]
+        return data
 
 
 class RoleModel(models.Model, BaseModelWithLogger):
@@ -85,6 +133,9 @@ class RoleModel(models.Model, BaseModelWithLogger):
 
     def __str__(self):
         return f'​✅[{self.id}] {self.app}.{self.model} '
+
+    def as_key(self):
+        return f'{self.app}.{self.model}'
 
 
 class Role(models.Model, BaseModelWithLogger):
@@ -100,6 +151,20 @@ class Role(models.Model, BaseModelWithLogger):
 
     def __str__(self):
         return '%s : %s' % (self.value if self.value else '',  self.description if self.description else '')
+
+    def to_dict(self, exclude_fields=['id']):
+        data = super().to_dict(exclude_fields)
+        models_fields = {}
+        exclude_fields_rf = ['id', 'role', 'role_model', 'value']
+        for rf in RoleField.objects.filter(role=self.id):
+            key_model = rf.role_model.as_key()
+            key_field = rf.value
+            if key_model in models_fields:
+                models_fields[key_model][key_field] = rf.to_dict(exclude_fields_rf)
+            else:
+                models_fields[key_model] = {key_field:rf.to_dict(exclude_fields_rf)}
+        data['models_fields'] = models_fields
+        return data
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
@@ -126,6 +191,11 @@ class RoleField(models.Model, BaseModelWithLogger):
         verbose_name_plural = f'🤵{_("Role Fields")}'
         ordering = ['value']
 
+    # def to_dict(self, exclude_fields=['id']):
+    #     data = super().to_dict(exclude_fields)
+    #     data['models_fields'] = {rf.value:rf.to_dict() for rf in RoleField.objects.filter(role=self.id)}
+    #     return data
+
 
 class User(AbstractUser, BaseModelWithLogger):
     cache = caches['users']
@@ -141,6 +211,17 @@ class User(AbstractUser, BaseModelWithLogger):
         db_table = 'auth_user'
         verbose_name = f'🤵{_("User")}'
         verbose_name_plural = f'🤵{_("Users")}'
+
+    def to_dict(self, exclude_fields='__all__'):
+        data = super().to_dict(exclude_fields)
+        if 'role' in data:
+            data['role'] = self.role.to_dict()
+        if 'user_permissions' in data:
+            data['user_permissions'] = [x.codename for x in Permission.objects.filter(user=self)]
+        if 'groups' in data:
+            p = Permission.objects.filter(group__in=data['groups']).distinct()
+            data['groups'] = [x.codename for x in p]
+        return data
 
     def sync_from_role_group(self):
         if self.role and self.role.group and self.role.group not in self.groups.all():
