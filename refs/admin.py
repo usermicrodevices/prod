@@ -802,6 +802,10 @@ class ProductAdmin(CustomModelAdmin):
             self.exclude = ('cost', 'get_cost')
         form = super().get_form(request, obj, **kwargs)
         form.current_user = self.user
+        if not obj:
+            last_prod = Product.objects.order_by('article').last()
+            if last_prod and last_prod.article:
+                form.base_fields['article'].initial = ''.join([f'{int(it)+1}' if it.isdigit() else it for it in re.split(r'\W+', last_prod.article)])
         return form
 
     def get_last_reg(self, obj):
