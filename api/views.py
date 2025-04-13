@@ -322,7 +322,17 @@ class DocsView(ListView, LogMixin):
         page_num = int(request.GET.pop('page', [self.page_num_default])[0])
         limit = int(request.GET.pop('limit', [self.limit_default])[0])
         if request.GET:
-            self.queryset = self.queryset.filter(**request.GET)
+            filters = {}
+            for k, v in request.GET.items():
+                if isinstance(v, list):
+                    if '__in' in k:
+                        v = tuple(v)
+                    elif len(v) == 1:
+                        v = v[0]
+                filters[k] = v
+            self.queryset = self.queryset.filter(**filters)
+        if settings.DEBUG:
+            self.logd(self.queryset.query)
         paginator = Paginator(self.queryset, self.limit_default)
         page_obj = paginator.get_page(page_num)
         if settings.DEBUG:
