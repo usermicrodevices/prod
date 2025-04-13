@@ -35,10 +35,8 @@ class Usr(TransactionTestCase):
     csrfmiddlewaretoken = ''
 
     def setUp(self):
-        # user_name = f'test_{int(django_timezone.now().timestamp())}'
-        # self.test_password = 't0#e9@s8$t7'
-        user_name = 'forecaster'
-        self.test_password = 'poi098'
+        user_name = f'test_{int(django_timezone.now().timestamp())}'
+        self.test_password = 't0#e9@s8$t7'
         self.user = get_user_model()(username=user_name, password=make_password(self.test_password), email='test@test.test', first_name='Test', last_name='tesT', is_staff=True, is_active=True, is_superuser=True, role = get_model('users.Role').objects.get(value='kassa'))
         #self.user.save()
         ##self.user.groups.add(Group.objects.get(id=1))
