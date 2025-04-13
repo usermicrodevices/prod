@@ -35,9 +35,12 @@ class Usr(TransactionTestCase):
     csrfmiddlewaretoken = ''
 
     def setUp(self):
-        self.test_password = 't0#e9@s8$t7'
-        self.user = get_user_model()(username=f'test_{int(django_timezone.now().timestamp())}', password=make_password(self.test_password), email='test@test.test', first_name='Test', last_name='tesT', is_staff=True, is_active=True, is_superuser=True, role = get_model('users.Role').objects.get(value='kassa'))
-        self.user.save()
+        # user_name = f'test_{int(django_timezone.now().timestamp())}'
+        # self.test_password = 't0#e9@s8$t7'
+        user_name = 'forecaster'
+        self.test_password = 'poi098'
+        self.user = get_user_model()(username=user_name, password=make_password(self.test_password), email='test@test.test', first_name='Test', last_name='tesT', is_staff=True, is_active=True, is_superuser=True, role = get_model('users.Role').objects.get(value='kassa'))
+        #self.user.save()
         ##self.user.groups.add(Group.objects.get(id=1))
         print(self.user.id, self.user, self.test_password)
         print()
@@ -56,7 +59,8 @@ class Usr(TransactionTestCase):
 
     def tearDown(self):
         self.client.logout()
-        self.user.delete()
+        if self.user.id:
+            self.user.delete()
 
     def login(self):
         print()
@@ -136,7 +140,9 @@ class Usr(TransactionTestCase):
         self.assertEqual(response.status_code, 200)
         print('Request♥', response.request)
         print('Response♡', response, response.headers)
-        print('DATA⋆', eval(response.content.decode('utf8').replace('null', 'None')))
+        print('Content⋆', response.content.decode('utf8').replace('\\', ''))
+        docs = eval(response.content.decode('utf8').replace('\\', '').replace('null', 'None').strip('"'))
+        print('DATA⋆', docs)
         print()
         url = '/api/doc/cash/'
         prods = get_model('refs.Product').objects.all()[:5]
@@ -148,6 +154,16 @@ class Usr(TransactionTestCase):
         print('Request♥', response.request)
         print('Response♡', response, response.headers)
         print('DATA⋆', eval(response.content))
+        print()
+        if docs:
+            print('⚽docs[0]', docs[0])
+            url = f'/api/doc/{docs[0].get("pk", 1)}/sales_receipt'
+            print('⚽GET', url)
+            response = self.client.get(url, headers={'X-CSRFToken':self.csrfmiddlewaretoken})
+            print('Request♥', response.request)
+            print('Response♡', response, response.headers)
+            print('HTML⋆', response.content.decode('utf8'))
+            self.assertInHTML('<!DOCTYPE html>', response.content.decode('utf8'))
 
     def test_customers(self):
         print()
