@@ -1,6 +1,6 @@
-import json, logging, sys
+import json, logging, locale, re, sys
 
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views import View
 from django.views.generic import ListView, DetailView
 from django.core.serializers import serialize#, JSONSerializer
@@ -16,9 +16,10 @@ from django.conf import settings
 from django.db.models import F, Q, Sum
 from django.utils.dateparse import parse_datetime
 from django.shortcuts import get_object_or_404
+from django.template import Context, Template
 
 from users.models import User, RoleField
-from refs.models import Company, Customer, DocType, Product
+from refs.models import Company, Customer, DocType, Product, PrintTemplates
 from core.models import Doc, Record, Register
 
 
@@ -308,15 +309,30 @@ class DocsView(ListView, LogMixin):
     page_num_default = 1
     model = Doc
     context_object_name = 'docs'
-    queryset = model.objects.none()
+    queryset = model.objects.all()
 
     @method_decorator([ensure_csrf_cookie])
     def get(self, request, *args, **kwargs):
+        user = request.user
+        if not user:
+            return JsonResponse({'result':'error: Please enable cookies and try again.'}, status=401)
+        if not user.is_superuser:
+            self.queryset = self.queryset.filter(author=user)
         request.GET._mutable = True
         page_num = int(request.GET.pop('page', [self.page_num_default])[0])
         limit = int(request.GET.pop('limit', [self.limit_default])[0])
         if request.GET:
-            self.queryset = self.queryset.filter(**request.GET)
+            filters = {}
+            for k, v in request.GET.items():
+                if isinstance(v, list):
+                    if '__in' in k:
+                        v = tuple(v)
+                    elif len(v) == 1:
+                        v = v[0]
+                filters[k] = v
+            self.queryset = self.queryset.filter(**filters)
+        if settings.DEBUG:
+            self.logd(self.queryset.query)
         paginator = Paginator(self.queryset, self.limit_default)
         page_obj = paginator.get_page(page_num)
         if settings.DEBUG:
@@ -326,6 +342,35 @@ class DocsView(ListView, LogMixin):
             self.logd(json_data)
         rsp_hdrs = {'count':paginator.count, 'num_pages':paginator.num_pages, 'page_min':paginator.page_range.start, 'page_max':paginator.page_range.stop, 'page':page_num, 'limit':limit}
         return JsonResponse(json_data, safe=False, headers=rsp_hdrs)
+
+
+class DocViewSalesReceipt(View, LogMixin):
+    model = Doc
+    queryset = model.objects.none()
+
+    @method_decorator([ensure_csrf_cookie])
+    def get(self, request, pk=None):
+        obj = get_object_or_404(self.model, pk=pk)
+        m = obj.type._meta
+        als = f'{m.app_label}.{m.model_name}.{obj.type.alias}'
+        template = PrintTemplates.objects.filter(alias=als).first()
+        if not template:
+            return HttpResponse(f'PRINT TEMPLATE "{als}" NOT FOUND', status=404)
+        css_media_style = ''
+        if 'css_media_style' in template.extinfo:
+            css_media_style = template.extinfo['css_media_style']
+        if 'script' in template.extinfo:
+            script = template.extinfo['script']
+        records = Record.objects.filter(doc=obj).select_related('product')
+        body = Template(template.content).render(Context({'doc':obj, 'request':request, 'records':records}))
+        if not css_media_style:
+            css_media_style = '@media(orientation:portrait) print{html body{width:210mm;height:297mm;visibility:hidden;height:auto;margin:0;padding:0;}} @page{size:A4;margin:0;}'
+        body = f'<div id="section-to-print"><style>{css_media_style}</style>' + re.sub('(<!--.*?-->)', '', body, flags=re.DOTALL) + f'</div>{script}'
+        locale.setlocale(locale.LC_ALL, '')
+        lcl = locale.getlocale(locale.LC_MESSAGES)
+        lcode = lcl[0].split('_')[0] if lcl and lcl[0] else 'en'
+        html_content = f'<!DOCTYPE html><html lang="{lcode}"><head><meta charset="utf-8"><title>{obj}</title></head><body>{body}</body></html>'
+        return HttpResponse(html_content)
 
 
 class CustomersView(ListView, LogMixin):

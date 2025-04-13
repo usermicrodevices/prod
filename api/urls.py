@@ -11,6 +11,7 @@ urlpatterns = [
     path('products/cash/', views.ProductsCashView.as_view(), name='products-cash'),
     path('docs/', views.DocsView.as_view()),
     path('doc/<int:pk>/', views.DocView.as_view()),
+    path('doc/<int:pk>/sales_receipt', views.DocViewSalesReceipt.as_view()),
     path('doc/cash/', views.DocCashAddView.as_view(), name='doc-cash'),
     path('customers/', views.CustomersView.as_view(), name='customer')
 ]
