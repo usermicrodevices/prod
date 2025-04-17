@@ -52,7 +52,7 @@ def url_login(request):
                     u = User.objects.get(username=user_name)
                 except Exception as e:
                     logging.error(f'{e}; user_name={user_name}')
-                    return JsonResponse({'result':'error: user not found'}, status=404)
+                    return JsonResponse({'result':'error', 'description': f'{user_name} not found'}, status=404)
                 else:
                     if u and u.check_password(user_password):
                         request.session[SESSION_KEY] = f'{u.id}'
@@ -153,11 +153,9 @@ class ProductView(DetailView, LogMixin):
         return response
 
 
-class ProductsView(View, LogMixin):
+class PaginatedView(View, LogMixin):
     limit_default = 10
     page_num_default = 1
-    model = Product
-    queryset = model.objects.all()
 
     def serialize_handler(self, data, field_names='__all__'):
         return serialize('json', data, fields=field_names)
@@ -178,7 +176,7 @@ class ProductsView(View, LogMixin):
         else:
             if settings.DEBUG:
                 self.logd(paginated_data.object_list)
-            json_data = self.serialize_handler(paginated_data, ('id', 'article', 'name', 'cost', 'price', 'barcodes', 'currency'))
+            json_data = self.serialize_handler(paginated_data, self.fields)
         return paginator, json_data, http_status
 
     @method_decorator([ensure_csrf_cookie])
@@ -188,12 +186,28 @@ class ProductsView(View, LogMixin):
         request.GET._mutable = True
         page_num = int(request.GET.pop('page', [self.page_num_default])[0])
         limit = int(request.GET.pop('limit', [self.limit_default])[0])
-        paginator, json_data, http_status = self.paginate(self.queryset.filter(**request.GET), limit, page_num)
+        if request.GET:
+            filters = {}
+            for k, v in request.GET.items():
+                if isinstance(v, list):
+                    if '__in' in k:
+                        v = tuple(v)
+                    elif len(v) == 1:
+                        v = v[0]
+                filters[k] = v
+            self.queryset = self.queryset.filter(**filters)
+        paginator, json_data, http_status = self.paginate(self.queryset, limit, page_num)
         if settings.DEBUG:
             self.logd('JSON_DATA', json_data)
         rsp_hdrs = {'count':paginator.count, 'num_pages':paginator.num_pages, 'page_min':paginator.page_range.start, 'page_max':paginator.page_range.stop, 'page':page_num, 'limit':limit}
         response = JsonResponse(json_data, safe=False, status=http_status, headers=rsp_hdrs)
         return response
+
+
+class ProductsView(PaginatedView):
+    model = Product
+    queryset = model.objects.all()
+    fields = ('id', 'article', 'name', 'cost', 'price', 'barcodes', 'currency')
 
 
 class ProductsCashView(ProductsView):
@@ -373,28 +387,16 @@ class DocViewSalesReceipt(View, LogMixin):
         return HttpResponse(html_content)
 
 
-class CustomersView(ListView, LogMixin):
-    limit_default = 10
-    page_num_default = 1
+class CustomersView(PaginatedView):
     model = Customer
     queryset = model.objects.all()
+    fields = ('id', 'name', 'extinfo')
 
-    @method_decorator([ensure_csrf_cookie])
-    def get(self, request, *args, **kwargs):
-        request.GET._mutable = True
-        page_num = int(request.GET.pop('page', [self.page_num_default])[0])
-        limit = int(request.GET.pop('limit', [self.limit_default])[0])
-        if request.GET:
-            self.queryset = self.queryset.filter(**request.GET)
-        paginator = Paginator(self.queryset, self.limit_default)
-        page_obj = paginator.get_page(page_num)
-        if settings.DEBUG:
-            self.logd(page_obj.object_list)
-        json_data = serialize('json', page_obj, fields=('id', 'name', 'extinfo'))
-        if settings.DEBUG:
-            self.logd(json_data)
-        rsp_hdrs = {'count':paginator.count, 'num_pages':paginator.num_pages, 'page_min':paginator.page_range.start, 'page_max':paginator.page_range.stop, 'page':page_num, 'limit':limit}
-        return JsonResponse(json_data, safe=False, headers=rsp_hdrs)
+    def serialize_handler(self, data, field_names='__all__'):
+        list_data = []
+        for it in data:
+            list_data.append({'id':it.id, 'name':it.name, 'extinfo':it.extinfo})
+        return json.dumps(list_data, cls=DjangoJSONEncoder)
 
     @method_decorator([ensure_csrf_cookie])
     def post(self, request, *args, **kwargs):
@@ -409,10 +411,10 @@ class CustomersView(ListView, LogMixin):
         new_items = []
         for it in items:
             if it and isinstance(it, dict):
-                new_items.append(Customer(**it))
+                new_items.append(self.model(**it))
         if new_items:
             try:
-                objs = Customer.objects.bulk_create(new_items)
+                objs = self.model.objects.bulk_create(new_items)
             except Exception as e:
                 return JsonResponse({'result':f'error: {e}'}, status=500)
         return JsonResponse({'result':'success'}, safe=False)

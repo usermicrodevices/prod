@@ -38,7 +38,7 @@ class Usr(TransactionTestCase):
         user_name = f'test_{int(django_timezone.now().timestamp())}'
         self.test_password = 't0#e9@s8$t7'
         self.user = get_user_model()(username=user_name, password=make_password(self.test_password), email='test@test.test', first_name='Test', last_name='tesT', is_staff=True, is_active=True, is_superuser=True, role = get_model('users.Role').objects.get(value='kassa'))
-        #self.user.save()
+        self.user.save()
         ##self.user.groups.add(Group.objects.get(id=1))
         print(self.user.id, self.user, self.test_password)
         print()
@@ -173,7 +173,8 @@ class Usr(TransactionTestCase):
         print('Response♡', response, response.headers)
         print('DATA⋆', eval(response.content.decode('utf8').replace('null', 'None')))
         print()
-        data = json.dumps([{'name':'John Doe', 'extinfo':{'test':'key'}}, {'name':'Test Name', 'extinfo':{'key':'value'}}])
+        nowts = int(django_timezone.now().timestamp())
+        data = json.dumps([{'name':f'John Doe {nowts}', 'extinfo':{'test':'key'}}, {'name':f'Test Name {nowts}', 'extinfo':{'key':'value'}}])
         print('⚽POST', url, data)
         response = self.client.post(url, data, 'json', headers={'X-CSRFToken':self.csrfmiddlewaretoken})
         print('CONTENT♡', response.content)
