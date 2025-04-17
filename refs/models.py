@@ -343,7 +343,7 @@ class Product(CustomAbstractModel):
 
 
 class Customer(CustomAbstractModel):
-    name = models.CharField(max_length=191, default='', null=False, blank=False, verbose_name=_('name'), help_text=_('Caption of item'))
+    name = models.CharField(max_length=191, default='', null=False, blank=False, unique=True, verbose_name=_('name'), help_text=_('Caption of item'))
     extinfo = JSONField(default=dict, blank=True)
 
     class Meta:
