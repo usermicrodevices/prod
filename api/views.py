@@ -77,30 +77,33 @@ def url_logout(request):
 
 
 class LogMixin():
+    logging.disable(logging.NOTSET)
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG)
 
     def logi(self, *args):
         msg = f'ℹ{self.__class__.__name__}.{sys._getframe().f_back.f_code.co_name}'
         for arg in args:
             msg += f'::{arg}'
-        logging.info(msg)
+        self.logger.info(msg)
 
     def logw(self, *args):
         msg = f'⚠{self.__class__.__name__}.{sys._getframe().f_back.f_code.co_name}'
         for arg in args:
             msg += f'::{arg}'
-        logging.warning(msg)
+        self.logger.warning(msg)
 
     def logd(self, *args):
         msg = f'‼{self.__class__.__name__}.{sys._getframe().f_back.f_code.co_name}'
         for arg in args:
             msg += f'::{arg}'
-        logging.debug(msg)
+        self.logger.debug(msg)
 
     def loge(self, err, *args):
         msg = f'🆘{self.__class__.__name__}.{err.__traceback__.tb_frame.f_code.co_name}::{err}::LINE={err.__traceback__.tb_lineno}'
         for arg in args:
             msg += f'::{arg}'
-        logging.error(msg)
+        self.logger.error(msg)
 
 
 class ProductView(DetailView, LogMixin):
@@ -383,8 +386,30 @@ class DocViewSalesReceipt(View, LogMixin):
         locale.setlocale(locale.LC_ALL, '')
         lcl = locale.getlocale(locale.LC_MESSAGES)
         lcode = lcl[0].split('_')[0] if lcl and lcl[0] else 'en'
-        html_content = f'<!DOCTYPE html><html lang="{lcode}"><head><meta charset="utf-8"><title>{obj}</title></head><body>{body}</body></html>'
-        return HttpResponse(html_content)
+        pdf_engine = request.GET.get('pdf', '')
+        if not pdf_engine:
+            response = HttpResponse(f'<!DOCTYPE html><html lang="{lcode}"><head><meta charset="utf-8"><title>{obj}</title></head><body>{body}</body></html>')
+        else:
+            response = HttpResponse(body)
+            #sudo apt install texlive-xetex, wkhtmltopdf, pandoc
+            #pandoc --quiet (Suppress warning messages)
+            from subprocess import Popen, PIPE, STDOUT
+            try:
+                #pandoc = Popen(['pandoc', '--from=html', '--to=pdf', '--pdf-engine=xelatex', '--pdf-engine-opt=-recorder', '-V "mainfont:Times New Roman" -V "monofont:Times New Roman Mono"'], stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+                pandoc = Popen(['pandoc', '--from=html', '--to=pdf', f'--pdf-engine={pdf_engine}', f'-V lang={lcode}', '-V mainfont="Times New Roman"', '-V sansfont="DejaVu Sans"'], stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+            except Exception as e:
+                self.logw(e, 'PANDOC-HTML-TO-PDF')
+                response.status_code = 400
+                response.content = f'<!DOCTYPE html>{e};'
+            else:
+                response['Content-Type'] = 'application/pdf'
+                response['Content-Disposition'] = f'attachment; filename="sales_receipt_{obj.id}.pdf"'
+                response.content = pandoc.communicate(input=response.content)
+                pos = response.content.find(b'%PDF')
+                if pos:
+                    response['pdf-errors'] = response.content[:pos].replace(b'\n', b'|').replace(b'\r', b'')
+                    response.content = response.content[pos:response.content.find(b'%%EOF')+5]
+        return response
 
 
 class CustomersView(PaginatedView):

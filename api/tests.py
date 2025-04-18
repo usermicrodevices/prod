@@ -155,13 +155,35 @@ class Usr(TransactionTestCase):
         print()
         if docs:
             print('⚽docs[0]', docs[0])
-            url = f'/api/doc/{docs[0].get("pk", 1)}/sales_receipt'
+            url = f'/api/doc/{docs[0].get('pk', 1)}/sales_receipt'
             print('⚽GET', url)
             response = self.client.get(url, headers={'X-CSRFToken':self.csrfmiddlewaretoken})
             print('Request♥', response.request)
             print('Response♡', response, response.headers)
             print('HTML⋆', response.content.decode('utf8'))
             self.assertInHTML('<!DOCTYPE html>', response.content.decode('utf8'))
+            print()
+            url = f'/api/doc/{docs[0].get('pk', 1)}/sales_receipt?pdf=xelatex'
+            print('⚽GET', url)
+            response = self.client.get(url, headers={'X-CSRFToken':self.csrfmiddlewaretoken})
+            print('Request♥', response.request)
+            print('Response♡', response, response.headers)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(b'%PDF' in response.content, True)
+            fn = response.headers.get('Content-Disposition', 'attachment; filename="test.pdf"').split('=')[1].strip('"')
+            with open(f'{int(django_timezone.now().timestamp())}_{fn}', 'wb') as f:
+                f.write(response.content)
+            print()
+            url = f'/api/doc/{docs[0].get('pk', 1)}/sales_receipt?pdf=wkhtmltopdf'
+            print('⚽GET', url)
+            response = self.client.get(url, headers={'X-CSRFToken':self.csrfmiddlewaretoken})
+            print('Request♥', response.request)
+            print('Response♡', response, response.headers)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(b'%PDF' in response.content, True)
+            fn = response.headers.get('Content-Disposition', 'attachment; filename="test.pdf"').split('=')[1].strip('"')
+            with open(f'{int(django_timezone.now().timestamp())+1}_{fn}', 'wb') as f:
+                f.write(response.content)
 
     def test_customers(self):
         print()
