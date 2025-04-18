@@ -33,3 +33,8 @@ and go to your browser http://127.0.0.1:8000/admin
 daphne -e ssl:interface=127.0.0.1:9443:privateKey=ssl-cert-snakeoil.key:certKey=ssl-cert-snakeoil.pem shop.asgi:application
 ```
 and go to your browser https://127.0.0.1:9443/admin
+
+# OPTIONAL get sales receipt as PDF format
+```
+sudo apt install texlive-xetex, wkhtmltopdf, pandoc
+```
