@@ -144,7 +144,7 @@ class Usr(TransactionTestCase):
         print()
         url = '/api/doc/cash/'
         prods = get_model('refs.Product').objects.all()[:5]
-        data = json.dumps({'sum_final':1000, 'registered_at':datetime.now().astimezone().strftime('%Y-%m-%dT%H:%M:%S %z'), 'records':[{'product':p.id, 'count':10, 'price':f'{p.price}'} for p in prods]})
+        data = json.dumps({'sum_final':1000, 'registered_at':datetime.now().astimezone().strftime('%Y-%m-%dT%H:%M:%S %z'), 'records':[{'product':p.id, 'count':10, 'price':f'{p.price}'} for p in prods], 'customer':{'name':'New Customer'}})
         print('⚽POST', url, data)
         response = self.client.post(url, data, 'json', headers={'X-CSRFToken':self.csrfmiddlewaretoken})
         print('CONTENT♡', response.content)
