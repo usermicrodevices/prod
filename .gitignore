@@ -177,3 +177,4 @@ static/
 *.pem
 *.key
 *.xml
+*.pdf

@@ -273,9 +273,30 @@ class DocCashAddView(View, LogMixin):
             dtype = data.get('type', 'sale')
             doc_type, created = DocType.objects.get_or_create(alias=dtype, defaults={'alias':dtype, 'name':dtype.title()})
             doc = Doc(type=doc_type, registered_at=parse_datetime(registered_at), owner_id=id_owner, contractor_id=id_contractor, author=request.user, sum_final=sum_final)
-            id_customer = data.get('customer', None)
-            if id_customer:
-                doc.customer_id = id_customer
+            customer = data.get('customer', {'id':None, 'name':'', 'extinfo':{}})
+            if not isinstance(customer, dict):
+                self.logw(customer, 'CUSTOMER MUST BE AS DICTIONARY')
+            else:
+                if customer.get('id', None):
+                    doc.customer_id = id_customer
+                else:
+                    customer_name = customer.get('name', '')
+                    if customer_name:
+                        dbcustomer = None
+                        try:
+                            dbcustomer = Customer.objects.get(name=customer_name)
+                        except Customer.DoesNotExist as e:
+                            self.logw(e)
+                            dbcustomer = Customer(name=customer_name)
+                            try:
+                                dbcustomer.save()
+                            except Exception as e:
+                                self.loge(e, customer)
+                                dbcustomer = None
+                        except Exception as e:
+                            self.loge(e, customer)
+                        if dbcustomer:
+                            doc.customer_id = dbcustomer.id
             recs = []
             for r in records:
                 try:
