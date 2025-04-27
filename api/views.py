@@ -277,7 +277,8 @@ class DocCashAddView(View, LogMixin):
             if not isinstance(customer, dict):
                 self.logw(customer, 'CUSTOMER MUST BE AS DICTIONARY')
             else:
-                if customer.get('id', None):
+                id_customer = customer.get('id', None)
+                if id_customer is not None and Customer.objects.filter(id=id_customer).exists():
                     doc.customer_id = id_customer
                 else:
                     customer_name = customer.get('name', '')
