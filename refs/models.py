@@ -1,4 +1,4 @@
-import logging, sys, time
+import logging, os, sys, time
 from uuid import uuid4
 from itertools import chain
 from datetime import datetime, timedelta, timezone
@@ -46,9 +46,10 @@ class CustomAbstractModel(models.Model):
         logging.warning(msg)
 
     def loge(self, err, *args):
-        msg = f'🆘{self.__class__.__name__}.{err.__traceback__.tb_frame.f_code.co_name}::{err}::LINE={err.__traceback__.tb_lineno}'
+        msg = f'🆘{self.__class__.__name__}.{err.__traceback__.tb_frame.f_code.co_name}'
         for arg in args:
             msg += f'::{arg}'
+        msg += f'::{err}::LINE={err.__traceback__.tb_lineno}'
         logging.error(msg)
 
     def get_fields_names(self):
@@ -98,10 +99,12 @@ class CustomAbstractModel(models.Model):
             data[f.name] = [i.id for i in f.value_from_object(self)]
         return data
 
+
 def default_ptmpl_dict():
     return {"script": "<script>window.onload=function(){document.getElementsByTagName(\"head\")[0].remove();document.body.style.margin=0;document.body.style.padding=0;document.body.style.width=0;document.body.style.height=0;const parea = document.getElementById(\"section-to-print\");while(document.body.firstChild){document.body.removeChild(document.body.firstChild);}document.body.appendChild(parea);setTimeout(function(){window.print();},0);window.onfocus=function(){setTimeout(function(){window.location.reload();},0);}}</script>", "css_media_style": "@media (orientation:portrait) print{html body{width:210mm;height:297mm;visibility:hidden;height:auto;margin:0;padding:0;}} .content{position:absolute;top:0;} .messagelist{margin:0;padding:0;} #section-to-print{text-align:center;background-color:white;display:flex;flex-direction:column;visibility:visible;position:absolute;left:0;top:0;margin:0;padding:0;width:95%;height:95%;} @page{size:A4;margin:0;} .page-pad{page-break-after:always;} .page-pad:last-of-type{page-break-after:avoid!important;} html:root{--message-success-bg:unset;} #container{height:max-content;width:max-content;min-width:unset;} ul.messagelist li{display:unset;margin:0;padding:0;background:white;background-size:unset;font-size:unset;word-break:unset;color:black;} header,footer,aside,nav,form,iframe,button,.ad,.success,#header,#content,#toggle-nav-sidebar{display:none;}"}
 
-class PrintTemplates(models.Model):
+
+class PrintTemplates(CustomAbstractModel):
     alias = models.CharField(max_length=191, unique=True, null=False, blank=False, default='refs.doctype.sale', verbose_name=_('alias'))
     content = models.TextField(null=False, blank=False, default='''<table class="page-pad" style="border:1px solid black;margin-left:auto;margin-right:auto;border-collapse:collapse;"><caption>{{doc.type.name}} N{{doc.id}} from {{doc.registered_at}}<p style="text-align:left;margin:0;padding:0;">seler: {{doc.owner}}</p><p style="text-align:left;margin:0;padding:0;">purchaser: {{doc.contractor.name}}</p></caption><thead><tr><th style="width:5%;border:2px solid black;">number</th><th style="width:15%;border:2px solid black;">article</th><th style="width:50%;border:2px solid black;">product</th><th style="width:10%;border:2px solid black;">count</th><th style="width:10%;border:2px solid black;">price</th><th style="width:10%;border:2px solid black;">sum</th></tr></thead><tbody>{% for r in records %}<tr><td style="border:2px solid black;">{{forloop.counter}}</td><td style="border:2px solid black;">{{r.product.article}}</td><td style="border:2px solid black;">{{r.product.name}}</td><td style="border:2px solid black;">{{r.count}}</td><td style="border:2px solid black;">{{r.price}}</td><td style="border:2px solid black;">{{r.sum_price}}</td></tr>{% endfor %}<tr><td style="border:2px solid black;text-align:right;" colspan=6>Total: {{doc.sum_final}}</td></tr></tbody></table>''', verbose_name=_('content'))
     extinfo = JSONField(default=default_ptmpl_dict, blank=True)
@@ -111,7 +114,7 @@ class PrintTemplates(models.Model):
         verbose_name_plural = f'🖶{_("Print Templates")}'
 
 
-class Unit(models.Model):
+class Unit(CustomAbstractModel):
     label = models.CharField(max_length=191, unique=True, null=False, blank=False, default='', verbose_name=_('label of unit'))
     name = models.CharField(max_length=191, verbose_name=_('name of unit'))
 
@@ -123,7 +126,7 @@ class Unit(models.Model):
         verbose_name_plural = f'👾{_("Units")}'
 
 
-class Tax(models.Model):
+class Tax(CustomAbstractModel):
     name = models.CharField(max_length=191, unique=True, null=False, blank=False, default='', verbose_name=_('name'))
     alias = models.CharField(max_length=191, null=True, blank=True, default='', verbose_name=_('alias'))
     value = models.IntegerField(default=None, null=True, blank=True, verbose_name=_('value'), help_text=_('percentage value of tax'))
@@ -137,7 +140,7 @@ class Tax(models.Model):
         ordering = ['name']
 
 
-class Currency(models.Model):
+class Currency(CustomAbstractModel):
     name = models.CharField(max_length=191, unique=True, null=False, blank=False, default='₽')
     alias = models.CharField(max_length=191, null=True, blank=True, default='rub')
 
@@ -150,7 +153,7 @@ class Currency(models.Model):
         ordering = ['name']
 
 
-class Country(models.Model):
+class Country(CustomAbstractModel):
     name = models.CharField(max_length=191, unique=True, null=False, blank=False, default='', verbose_name=_('name'), help_text=_('name of country'))
 
     def __str__(self):
@@ -162,7 +165,7 @@ class Country(models.Model):
         ordering = ['name']
 
 
-class Region(models.Model):
+class Region(CustomAbstractModel):
     name = models.CharField(max_length=191, null=False, blank=False, default='', verbose_name=_('name'), help_text=_('name of region'))
     country = models.ForeignKey(Country, null=False, blank=False, default=1, on_delete=models.CASCADE, verbose_name=_('country'), help_text=_('country of region'))
 
@@ -176,7 +179,7 @@ class Region(models.Model):
         ordering = ['name']
 
 
-class City(models.Model):
+class City(CustomAbstractModel):
     name = models.CharField(max_length=191, null=False, blank=False, default='', verbose_name=_('name'), help_text=_('name of city'))
     region = models.ForeignKey(Region, null=False, blank=False, default=1, on_delete=models.CASCADE, verbose_name=_('region'), help_text=_('region of city'))
 
@@ -190,7 +193,7 @@ class City(models.Model):
         ordering = ['name']
 
 
-class Manufacturer(models.Model):
+class Manufacturer(CustomAbstractModel):
     name = models.CharField(max_length=191, default='', unique=True, verbose_name=_('caption'), help_text=_('Caption of manufacturer'))
     city = models.ForeignKey(City, default=None, null=True, blank=True, on_delete=models.SET_NULL, verbose_name=_('city'), help_text=_('city of manufacturer'))
 
@@ -203,7 +206,7 @@ class Manufacturer(models.Model):
         ordering = ['name']
 
 
-class ProductModel(models.Model):
+class ProductModel(CustomAbstractModel):
     name = models.CharField(max_length=191, default='', unique=True, verbose_name=_('caption'), help_text=_('Caption of model'))
     manufacturer = models.ForeignKey(Manufacturer, default=None, null=True, blank=True, on_delete=models.PROTECT, verbose_name=_('manufacturer'), help_text=_('manufacturer of model'))
 
@@ -216,7 +219,7 @@ class ProductModel(models.Model):
         ordering = ['name']
 
 
-class CompanyType(models.Model):
+class CompanyType(CustomAbstractModel):
     name = models.CharField(max_length=191, default='', unique=True, verbose_name=_('name'), help_text=_('Type of company'))
 
     def __str__(self):
@@ -248,7 +251,7 @@ class Company(CustomAbstractModel):
         return self.name
 
 
-class SalePoint(models.Model):
+class SalePoint(CustomAbstractModel):
     company = models.ForeignKey(Company, on_delete=models.CASCADE, verbose_name=_('company'))
     name = models.CharField(max_length=191, default='', verbose_name=_('caption'), help_text=_('Caption of object'))
     created_date = models.DateTimeField(auto_now_add=True, verbose_name=_('created date'), help_text=_('Date of creation on server'))
@@ -270,7 +273,7 @@ class SalePoint(models.Model):
         return '[{}]{}'.format(self.id, self.name)
 
 
-class BarCode(models.Model):
+class BarCode(CustomAbstractModel):
     id = models.CharField(primary_key=True, max_length=191, unique=True, default=ean13, null=False, blank=False, verbose_name=_('value'), help_text=_('product barcode'))
 
     class Meta:
@@ -278,7 +281,7 @@ class BarCode(models.Model):
         verbose_name_plural = f'Ⅲ{_("Bar Codes")}'
 
 
-class QrCode(models.Model):
+class QrCode(CustomAbstractModel):
     id = models.CharField(primary_key=True, max_length=191, unique=True, default=uuid4, null=False, blank=False, verbose_name=_('value'), help_text=_('product qrcode'))
 
     class Meta:
@@ -286,7 +289,7 @@ class QrCode(models.Model):
         verbose_name_plural = f'𝍌{_("Qr Codes")}'
 
 
-class DocType(models.Model):
+class DocType(CustomAbstractModel):
     alias = models.CharField(max_length=191, unique=True, default='receipt', null=False, blank=False)
     name = models.CharField(max_length=191, default=_('Receipt'), verbose_name=_('name'), help_text=_('name of type document'))
     income = models.BooleanField(default=True, null=False, blank=False, verbose_name=_('income'), help_text=_('income or expense'))
@@ -302,7 +305,44 @@ class DocType(models.Model):
         ordering = ['name']
 
 
-class ProductGroup(models.Model):
+class ProductImage(CustomAbstractModel):
+
+    def uploadto(self, filename):
+        # uploaded to MEDIA_ROOT/products/
+        return f'products/{django_timezone.now().strftime("%Y%m%d%H%M%S")}_{filename}'
+
+    #ImageField required pillow and not support some new formats - better use FileField directly
+    #file = models.ImageField(upload_to=uploadto, default=None, null=True, blank=True)
+    file = models.FileField(upload_to=uploadto, max_length=255, default=None, null=True, blank=True, verbose_name=_('file'))
+    created_at = models.DateTimeField(_('date created'), auto_now_add=True, editable=False)
+    extinfo = JSONField(default=dict, blank=True)
+
+    class Meta:
+        verbose_name = f'📄{_("Product Image")}'
+        verbose_name_plural = f'📄{_("Product Images")}'
+
+
+@receiver(post_delete, sender=ProductImage)
+def product_image_post_delete(sender, instance, **kwargs):
+    if instance.file:
+        if os.path.isfile(instance.file.path):
+            os.remove(instance.file.path)
+
+
+@receiver(pre_save, sender=ProductImage)
+def product_image_pre_save(sender, instance, **kwargs):
+    if not instance.pk:
+        return False
+    try:
+        file_was = ProductImage.objects.get(pk=instance.pk).file
+    except ProductImage.DoesNotExist:
+        return False
+    if file_was and file_was != instance.file:
+        if os.path.isfile(file_was.path):
+            os.remove(file_was.path)
+
+
+class ProductGroup(CustomAbstractModel):
     parent = models.ForeignKey('self', default=None, null=True, blank=True, on_delete=models.CASCADE)
     name = models.CharField(max_length=191, unique=True, default=_('Products'), verbose_name=_('name'), help_text=_('name of products group'))
     alias = models.CharField(max_length=191, default=None, null=True, blank=True, verbose_name=_('alias'), help_text=_('alias of products group'))
@@ -331,6 +371,8 @@ class Product(CustomAbstractModel):
     qrcodes = models.ManyToManyField(QrCode, default=None, blank=True, verbose_name=_('qrcodes'), help_text=_('list qrcodes of product'))
     group = models.ForeignKey(ProductGroup, default=None, null=True, blank=True, on_delete=models.SET_NULL)
     extinfo = JSONField(default=dict, blank=True)
+    thumbnail = models.TextField(default=None, null=True, blank=True, verbose_name=_('thumbnail'), help_text=_('image as')+' BASE64')
+    images = models.ManyToManyField(ProductImage, default=None, blank=True, verbose_name=_('images'), help_text=_('list images of product'))
 
     class Meta:
         unique_together = ('article', 'name')

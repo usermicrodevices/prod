@@ -173,6 +173,7 @@ cython_debug/
 
 conf/
 static/
+media/
 **/migrations/
 *.pem
 *.key
