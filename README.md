@@ -38,3 +38,8 @@ and go to your browser https://127.0.0.1:9443/admin
 ```
 sudo apt install texlive-xetex, wkhtmltopdf, pandoc
 ```
+
+# OPTIONAL use thumbnail images
+```
+sudo apt install libpng-dev libjpeg-dev libtiff-dev imagemagick
+```

@@ -646,3 +646,33 @@ msgstr "удалены штрихкоды"
 
 msgid "delete all without products"
 msgstr "удалить все без товаров"
+
+msgid "file"
+msgstr "файл"
+
+msgid "thumbnail"
+msgstr "иконка"
+
+msgid "images"
+msgstr "изображения"
+
+msgid "image as"
+msgstr "изображение как"
+
+msgid "list images of product"
+msgstr "список изображений товара"
+
+msgid "Product Image"
+msgstr "Изображение Товара"
+
+msgid "Product Images"
+msgstr "Изображения Товаров"
+
+msgid "date created"
+msgstr "дата создания"
+
+msgid "thumbnail from first image"
+msgstr "иконка из первого изображения"
+
+msgid "export thumbnails to XLS file"
+msgstr "выгрузить иконки в XLS файл"

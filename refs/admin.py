@@ -1,4 +1,4 @@
-import logging, re, sys, time
+import base64, logging, os, re, sys, time
 from decimal import Decimal
 from io import BytesIO, StringIO
 from datetime import datetime, timedelta
@@ -28,7 +28,7 @@ from django.core.cache import caches
 from django.conf import settings
 from django.apps import apps as django_apps
 
-from .models import PrintTemplates, Unit, Currency, Country, Region, City, Tax, CompanyType, Company, SalePoint, Manufacturer, ProductModel, BarCode, QrCode, DocType, ProductGroup, Product, Customer
+from .models import PrintTemplates, Unit, Currency, Country, Region, City, Tax, CompanyType, Company, SalePoint, Manufacturer, ProductModel, BarCode, QrCode, DocType, ProductGroup, Product, Customer, ProductImage
 from users.models import User
 
 def get_model(app_model):
@@ -413,9 +413,10 @@ class CustomModelAdmin(admin.ModelAdmin):
         logging.debug(msg)
 
     def loge(self, err, *args):
-        msg = f'🆘{self.__class__.__name__}.{err.__traceback__.tb_frame.f_code.co_name}::{err}::LINE={err.__traceback__.tb_lineno}'
+        msg = f'🆘{self.__class__.__name__}.{err.__traceback__.tb_frame.f_code.co_name}'
         for arg in args:
             msg += f'::{arg}'
+        msg += f'::{err}::LINE={err.__traceback__.tb_lineno}'
         logging.error(msg)
 
     def noselect_actions(self, request, auto_selectable_actions=[]):
@@ -435,6 +436,12 @@ class CustomModelAdmin(admin.ModelAdmin):
             func_write = worksheet.write_number
         elif type_value == 'as_datetime':
             func_write = worksheet.write_datetime
+        elif type_value == 'as_base64':
+            try:
+                worksheet.embed_image(row, col, fmt, {'image_data': value})
+            except Exception as e:
+                self.loge(e, row, col, fmt)
+            return col + 1
         try:
             if fmt:
                 func_write(row, col, value, fmt)
@@ -509,6 +516,12 @@ class CustomModelAdmin(admin.ModelAdmin):
                                 tvalue = 'as_number'
                             elif not isinstance(value, str):
                                 value = f'{value}'
+                            elif isinstance(value, str) and 'data:image/' in value and ';base64,' in value:
+                                #with open(f'{row}{col}.png', 'wb') as fpng:
+                                    #fpng.write(base64.decodebytes(value.split(';base64,')[1].encode()))
+                                value = BytesIO(base64.decodebytes(value.split(';base64,')[1].encode()))
+                                tvalue = 'as_base64'
+                                format_value = f'{row}{col}.png'
                             col = self.worksheet_cell_write(worksheet, row, col, value, tvalue, format_value)
                 if settings.DEBUG:
                     self.logd('ROW', row, record)
@@ -760,13 +773,14 @@ admin.site.register(ProductGroup, ProductGroupAdmin)
 class ProductAdmin(CustomModelAdmin):
     __objs__ = {}
     user = None
-    list_display = ['id', 'article', 'name', 'get_barcodes', 'get_qrcodes', 'get_price', 'count', 'get_sum', 'get_tax', 'get_model', 'get_group', 'extinfo']
+    list_display = ['id', 'article', 'name', 'get_barcodes', 'get_qrcodes', 'get_price', 'count', 'get_sum', 'get_tax', 'get_model', 'get_group', 'get_thumbnail', 'extinfo']
     list_display_links = ('id', 'article', 'name')
     search_fields = ('name', 'article', 'extinfo', 'barcodes__id', 'qrcodes__id', 'group__name')
     list_select_related = ('tax', 'model', 'group')
+    raw_id_fields = ['images']
     list_filter = (ProductGroupFilter, ProductManufacturerFilter, ProductModelFilter, TaxFilter)
     autocomplete_fields = ('tax', 'model', 'group', 'barcodes', 'qrcodes')
-    actions = ('from_xls_with_check', 'from_xls', 'to_xls', 'price_to_xls', 'barcode_to_svg', 'fix_barcodes', 'copy_unit', 'copy_cost', 'copy_price', 'copy_cost_price', 'reset_cached')
+    actions = ('from_xls_with_check', 'from_xls', 'to_xls', 'price_to_xls', 'barcode_to_svg', 'fix_barcodes', 'copy_unit', 'copy_cost', 'copy_price', 'copy_cost_price', 'thumbnail_from_first_image', 'thumbnails_to_xls', 'reset_cached')
 
     #class Media:
         #js = ['admin/js/autocomplete.js', 'admin/js/vendor/select2/select2.full.js']
@@ -952,11 +966,44 @@ class ProductAdmin(CustomModelAdmin):
     get_group.short_description = _('Product Group')
     get_group.admin_order_field = 'group'
 
-    def reset_cached(self, request, queryset, **kwargs):
+    def reset_cached(self, request, queryset):
         self.__objs__ = {}
     reset_cached.short_description = f'↻💦{_("reset cached values")}'
 
-    def from_xls_with_check(self, request, queryset, **kwargs):
+    def get_thumbnail(self, obj):
+        if obj.thumbnail:
+            return format_html('<img src="{}" width="32" height="32">', obj.thumbnail)
+        else:
+            return format_html('<img src="{}" width="32" height="32">', settings.DEFAUL_IMAGE_THUMBNAIL)
+    get_thumbnail.short_description = _('thumbnail')
+
+    def thumbnail_from_first_image(self, request, queryset):
+        from subprocess import Popen, PIPE
+        for item in queryset:
+            img = item.images.order_by('id').first()
+            if img and img.file and os.path.isfile(img.file.path):
+                self.logi(img.file.path)
+                try:
+                    convert = Popen(['convert', f'{img.file.path}', '-resize', '128x128', '-'], stdin=PIPE, stdout=PIPE, stderr=PIPE)
+                except Exception as e:
+                    self.loge(e)
+                else:
+                    stdout_data, stderr_data = convert.communicate(b'base64')
+                    if stderr_data:
+                        self.logw(stderr_data, convert.args)
+                    elif stdout_data:
+                        try:
+                            item.thumbnail = f'data:image/{img.file.path.split(".")[-1]};base64,{base64.b64encode(stdout_data).decode()}'
+                        except Exception as e:
+                            self.loge(e, img.file.path)
+                        else:
+                            try:
+                                item.save()
+                            except Exception as e:
+                                self.loge(e, item)
+    thumbnail_from_first_image.short_description = f'📄{_("thumbnail from first image")}'
+
+    def from_xls_with_check(self, request, queryset):
         from barcode import EAN13
         from transliterate import slugify
         from openpyxl import load_workbook
@@ -1107,7 +1154,7 @@ class ProductAdmin(CustomModelAdmin):
         return render(request, 'admin_select_file_form.html', context)
     from_xls_with_check.short_description = f'📍⚔📉{_("load from XLS file with check (slow)")}📈'
 
-    def from_xls(self, request, queryset, **kwargs):
+    def from_xls(self, request, queryset):
         from barcode import EAN13
         from transliterate import slugify
         from openpyxl import load_workbook
@@ -1282,6 +1329,20 @@ class ProductAdmin(CustomModelAdmin):
         self.message_user(request, _('please select items'), messages.ERROR)
     price_to_xls.short_description = f'⚔{_("unload price to XLS file")}↘'
 
+    def thumbnails_to_xls(self, request, queryset):
+        columns = {
+            'id':{'width':10},
+            'name':{'width':20},
+            'thumbnail':{'width':64}
+        }
+        output = self.queryset_to_xls(queryset, columns)
+        if output:
+            fn = '{}.xlsx'.format(django_timezone.now().strftime('%Y%m%d%H%M%S'))
+            self.message_user(request, f'🆗 {_("Finished")} ✏️({fn})', messages.SUCCESS)
+            return FileResponse(output, as_attachment=True, filename=fn)
+        self.message_user(request, _('please select items'), messages.ERROR)
+    thumbnails_to_xls.short_description = f'⚔📄{_("export thumbnails to XLS file")}📄↘'
+
     def barcode_to_svg(self, request, queryset):
         from textwrap import wrap
         from barcode import EAN13
@@ -1415,3 +1476,10 @@ class CustomerAdmin(CustomModelAdmin):
     list_display_links = ('id', 'name')
     search_fields = ('id', 'name', 'extinfo')
 admin.site.register(Customer, CustomerAdmin)
+
+
+class ProductImageAdmin(CustomModelAdmin):
+    list_display = ('id', 'created_at', 'file', 'extinfo')
+    list_display_links = ('id', 'created_at')
+    search_fields = ('id', 'created_at', 'file', 'extinfo')
+admin.site.register(ProductImage, ProductImageAdmin)
