@@ -676,3 +676,15 @@ msgstr "иконка из первого изображения"
 
 msgid "export thumbnails to XLS file"
 msgstr "выгрузить иконки в XLS файл"
+
+msgid "load thumbnails from XLS file"
+msgstr "загрузить иконки из XLS файла"
+
+msgid "filled thumbnails"
+msgstr "заполнено иконок"
+
+msgid "cleared thumbnails"
+msgstr "очищено иконок"
+
+msgid "clear thumbnail"
+msgstr "стереть иконоку"

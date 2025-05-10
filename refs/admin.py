@@ -1,6 +1,7 @@
 import base64, logging, os, re, sys, time
 from decimal import Decimal
 from io import BytesIO, StringIO
+from subprocess import Popen, PIPE
 from datetime import datetime, timedelta
 try:
     from zoneinfo import available_timezones, ZoneInfo
@@ -31,6 +32,7 @@ from django.apps import apps as django_apps
 from .models import PrintTemplates, Unit, Currency, Country, Region, City, Tax, CompanyType, Company, SalePoint, Manufacturer, ProductModel, BarCode, QrCode, DocType, ProductGroup, Product, Customer, ProductImage
 from users.models import User
 
+
 def get_model(app_model):
     app_name, model_name = app_model.split('.')
     return django_apps.get_app_config(app_name).get_model(model_name)
@@ -48,6 +50,45 @@ def get_queryset_by_sale_point(super, request):
     if user.is_superuser:
         return qs
     return qs.filter(Q(sale_point__company__in=user.companies.all()) | Q(sale_point__in=user.sale_points.all())).distinct()
+
+
+class RawImage:
+    _id = 1
+    format = "png"
+    path = f"/xl/media/image{_id}.{format}"
+    anchor = "A1"
+    width, height = 0, 0
+    def __init__(self, img):
+        self.ref = img
+    def _data(self):
+        return self.ref
+
+def raw_find_images(archive, path):
+    from openpyxl.xml.constants import IMAGE_NS
+    from openpyxl.xml.functions import fromstring
+    from openpyxl.drawing.spreadsheet_drawing import SpreadsheetDrawing
+    from openpyxl.packaging.relationship import get_rels_path, get_dependents
+    images = []
+    src = archive.read(path)
+    tree = fromstring(src)
+    try:
+        drawing = SpreadsheetDrawing.from_tree(tree)
+    except TypeError:
+        return [], images
+    rels_path = get_rels_path(path)
+    deps = []
+    if rels_path in archive.namelist():
+        deps = get_dependents(archive, rels_path)
+    for rel in drawing._blip_rels:
+        dep = deps.get(rel.embed)
+        if dep.Type == IMAGE_NS:
+            try:
+                image = RawImage(archive.read(dep.target))
+            except OSError:
+                continue
+            image.anchor = rel.anchor
+            images.append(image)
+    return [], images
 
 
 class DropDownFilter(admin.SimpleListFilter):
@@ -780,7 +821,7 @@ class ProductAdmin(CustomModelAdmin):
     raw_id_fields = ['images']
     list_filter = (ProductGroupFilter, ProductManufacturerFilter, ProductModelFilter, TaxFilter)
     autocomplete_fields = ('tax', 'model', 'group', 'barcodes', 'qrcodes')
-    actions = ('from_xls_with_check', 'from_xls', 'to_xls', 'price_to_xls', 'barcode_to_svg', 'fix_barcodes', 'copy_unit', 'copy_cost', 'copy_price', 'copy_cost_price', 'thumbnail_from_first_image', 'thumbnails_to_xls', 'reset_cached')
+    actions = ('from_xls_with_check', 'from_xls', 'to_xls', 'price_to_xls', 'barcode_to_svg', 'fix_barcodes', 'copy_unit', 'copy_cost', 'copy_price', 'copy_cost_price', 'thumbnails_from_xls', 'thumbnails_to_xls', 'thumbnail_from_first_image', 'thumbnail_clear', 'reset_cached')
 
     #class Media:
         #js = ['admin/js/autocomplete.js', 'admin/js/vendor/select2/select2.full.js']
@@ -802,7 +843,7 @@ class ProductAdmin(CustomModelAdmin):
                 self.list_display.insert(self.list_display.index('get_price'), 'get_cost')
         elif 'get_cost' in self.list_display:
             self.list_display.remove('get_cost')
-        request = self.noselect_actions(request, ['from_xls_with_check', 'from_xls', 'reset_cached'])
+        request = self.noselect_actions(request, ['from_xls_with_check', 'from_xls', 'thumbnails_from_xls', 'reset_cached'])
         return super().changelist_view(request, extra_context)
 
     def get_form(self, request, obj=None, **kwargs):
@@ -977,14 +1018,30 @@ class ProductAdmin(CustomModelAdmin):
             return format_html('<img src="{}" width="32" height="32">', settings.DEFAUL_IMAGE_THUMBNAIL)
     get_thumbnail.short_description = _('thumbnail')
 
+    def thumbnail_clear(self, request, queryset):
+        updated_products, errs = [], ''
+        for product in queryset:
+            if product.thumbnail:
+                product.thumbnail = None
+                updated_products.append(product)
+        if updated_products:
+            try:
+                Product.objects.bulk_update(updated_products, ['thumbnail'])
+            except Exception as e:
+                self.loge(e)
+                errs = f'; {e}'
+                updated_products = []
+        self.message_user(request, f'📄 {_("cleared thumbnails")} {len(updated_products)}{errs}📄', messages.SUCCESS)
+    thumbnail_clear.short_description = f'📄♻️{_("clear thumbnail")}📄'
+
     def thumbnail_from_first_image(self, request, queryset):
-        from subprocess import Popen, PIPE
+        result_count = 0
         for item in queryset:
             img = item.images.order_by('id').first()
             if img and img.file and os.path.isfile(img.file.path):
                 self.logi(img.file.path)
                 try:
-                    convert = Popen(['convert', f'{img.file.path}', '-resize', '128x128', '-'], stdin=PIPE, stdout=PIPE, stderr=PIPE)
+                    convert = Popen(['convert', f'{img.file.path}', '-resize', '256x256', '-'], stdin=PIPE, stdout=PIPE, stderr=PIPE)
                 except Exception as e:
                     self.loge(e)
                 else:
@@ -1001,7 +1058,95 @@ class ProductAdmin(CustomModelAdmin):
                                 item.save()
                             except Exception as e:
                                 self.loge(e, item)
-    thumbnail_from_first_image.short_description = f'📄{_("thumbnail from first image")}'
+        self.message_user(request, f'📄 {_("filled thumbnails")} {result_count} 📄', messages.SUCCESS)
+    thumbnail_from_first_image.short_description = f'📄{_("thumbnail from first image")}📄'
+
+    def thumbnails_from_xls(self, request, queryset):
+        from openpyxl import reader
+        from openpyxl.drawing.image import PILImage
+        form = None
+        if 'apply' in request.POST:
+            self.logi('💡', request.FILES)
+            form = UploadFileForm(request.POST, request.FILES)
+            if form.is_valid():
+                msg_err = ''
+                updated_products = []
+                file = form.cleaned_data['file']
+                if file:
+                    # memory optimized: better loop on every row VS all data load to RAM
+                    def search_image(sheet, r, c):
+                        for img in sheet._images:
+                            if img.anchor._from.row == r and img.anchor._from.col == c:
+                                return img._data()
+                        return None
+                    rdr = reader.excel.ExcelReader(file, False, False, False, True, False)
+                    if not PILImage:
+                        reader.excel.find_images = raw_find_images
+                    rdr.read()
+                    for sheetname in rdr.wb.sheetnames:
+                        self.logi('💡SHEET NAME', sheetname)
+                        ws = rdr.wb[sheetname]
+                        self.logi('🎈IMAGES', len(ws._images))
+                        list_rows = list(ws.rows)
+                        prefix_cells = list_rows[0]
+                        self.logi(prefix_cells)
+                        row = 0
+                        for cells in list_rows[1:]:
+                            if msg_err and msg_err[-1] != '\n':
+                                msg_err += '\n'
+                            row += 1
+                            p_id, p_name, p_image = 0, '', None
+                            col = 0
+                            try:
+                                for cell in list(cells):
+                                    match col:
+                                        case 0:
+                                            p_id = cell.value
+                                        case 1:
+                                            p_name = cell.value.strip() if cell.value else ''
+                                        case 2:
+                                            #🕵🔍 slowly, but memory optimized
+                                            p_image = search_image(ws, row, col)
+                                        case _:
+                                            break
+                                    col += 1
+                            except Exception as e:
+                                self.loge(e)
+                                msg_err += f'ROW {row}: {e}'
+                            else:
+                                if p_name and p_image:
+                                    product = Product.objects.filter(name=p_name).order_by('id').first()
+                                    if product and not product.thumbnail and p_image:
+                                        idata = base64.b64encode(p_image).decode()
+                                        product.thumbnail = f'data:image/{idata[3:5].lower()};base64,{idata}'
+                                        updated_products.append(product)
+                    if updated_products:
+                        try:
+                            Product.objects.bulk_update(updated_products, ['thumbnail'])
+                        except Exception as e:
+                            self.loge(e)
+                            updated_products = []
+                self.message_user(request, f'🆗 {file.name} ✏️ FILE SIZE={file.size} ✏️ UPDATED={len(updated_products)}; {msg_err}', messages.SUCCESS)
+                return HttpResponseRedirect(request.get_full_path())
+        if not form:
+            form = UploadFileForm(initial={'_selected_action': request.POST.getlist(admin.helpers.ACTION_CHECKBOX_NAME)})
+        m = queryset.model._meta
+        context = {}
+        context['items'] = []
+        context['form'] = form
+        context['title'] = _('File')
+        context['current_action'] = sys._getframe().f_code.co_name
+        context['subtitle'] = 'admin_select_file_form'
+        context['site_title'] = queryset.model._meta.verbose_name
+        context['is_popup'] = True
+        context['is_nav_sidebar_enabled'] = True
+        context['site_header'] = _('Admin panel')
+        context['has_permission'] = True
+        context['site_url'] = reverse('admin:{}_{}_changelist'.format(m.app_label, m.model_name))
+        context['available_apps'] = (m.app_label,)
+        context['app_label'] = m.app_label
+        return render(request, 'admin_select_file_form.html', context)
+    thumbnails_from_xls.short_description = f'📄⚔✏️{_("load thumbnails from XLS file")}📄'
 
     def from_xls_with_check(self, request, queryset):
         from barcode import EAN13
@@ -1341,7 +1486,7 @@ class ProductAdmin(CustomModelAdmin):
             self.message_user(request, f'🆗 {_("Finished")} ✏️({fn})', messages.SUCCESS)
             return FileResponse(output, as_attachment=True, filename=fn)
         self.message_user(request, _('please select items'), messages.ERROR)
-    thumbnails_to_xls.short_description = f'⚔📄{_("export thumbnails to XLS file")}📄↘'
+    thumbnails_to_xls.short_description = f'📄⚔{_("export thumbnails to XLS file")}↘📄'
 
     def barcode_to_svg(self, request, queryset):
         from textwrap import wrap
