@@ -60,7 +60,8 @@ class BaseModelWithLogger:
 
     def logi(self, *args):
         msg = f'{self.__class__.__name__}.{sys._getframe().f_back.f_code.co_name}'
-        for arg in args: msg += f'::{arg}'
+        for arg in args:
+            msg += f'::{arg}'
         logging.info(msg)
 
     def logd(self, *args):
@@ -71,12 +72,15 @@ class BaseModelWithLogger:
 
     def logw(self, *args):
         msg = f'{self.__class__.__name__}.{sys._getframe().f_back.f_code.co_name}'
-        for arg in args: msg += f'::{arg}'
+        for arg in args:
+            msg += f'::{arg}'
         logging.warning(msg)
 
     def loge(self, err, *args):
-        msg = f'{self.__class__.__name__}.{err.__traceback__.tb_frame.f_code.co_name}::{err}::LINE={err.__traceback__.tb_lineno}'
-        for arg in args: msg += f'::{arg}'
+        msg = f'{self.__class__.__name__}.{err.__traceback__.tb_frame.f_code.co_name}'
+        for arg in args:
+            msg += f'::{arg}'
+        msg += f'::{err}::LINE={err.__traceback__.tb_lineno}'
         logging.error(msg)
 
     def to_list(self, exclude_fields='__all__'):

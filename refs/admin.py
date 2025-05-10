@@ -821,7 +821,7 @@ class ProductAdmin(CustomModelAdmin):
     raw_id_fields = ['images']
     list_filter = (ProductGroupFilter, ProductManufacturerFilter, ProductModelFilter, TaxFilter)
     autocomplete_fields = ('tax', 'model', 'group', 'barcodes', 'qrcodes')
-    actions = ('from_xls_with_check', 'from_xls', 'to_xls', 'price_to_xls', 'barcode_to_svg', 'fix_barcodes', 'copy_unit', 'copy_cost', 'copy_price', 'copy_cost_price', 'thumbnails_from_xls', 'thumbnails_to_xls', 'thumbnail_from_first_image', 'thumbnail_clear', 'reset_cached')
+    actions = ('order_from_selected_items', 'from_xls_with_check', 'from_xls', 'to_xls', 'price_to_xls', 'barcode_to_svg', 'fix_barcodes', 'copy_unit', 'copy_cost', 'copy_price', 'copy_cost_price', 'thumbnails_from_xls', 'thumbnails_to_xls', 'thumbnail_from_first_image', 'thumbnail_clear', 'reset_cached')
 
     #class Media:
         #js = ['admin/js/autocomplete.js', 'admin/js/vendor/select2/select2.full.js']
@@ -1612,6 +1612,29 @@ class ProductAdmin(CustomModelAdmin):
             changed = queryset.exclude(cost=it_first.cost, price=it_first.price).update(cost=it_first.cost, price=it_first.price)
         self.message_user(request, f'{_("copied")} {changed}', messages.SUCCESS)
     copy_cost_price.short_description = f'🪙 {_("copy cost and price")} ₿💲💰'
+
+    def order_from_selected_items(self, request, queryset):
+        errs = ''
+        if queryset.count() > 1:
+            get_model('core.Doc')()
+            als = 'order'
+            doc_type, created = DocType.objects.get_or_create(alias=als, defaults={'alias':als, 'name':als})
+            id_owner = request.user.default_company.id if request.user.default_company else 1
+            doc = get_model('core.Doc')(type=doc_type, owner_id=id_owner, author=request.user)
+            try:
+                doc.save()
+            except Exception as e:
+                self.loge(e)
+                errs += f'{e}'
+            else:
+                recs = [get_model('core.Record')(count=1, cost=p.cost, price=p.price, doc=doc, currency=p.currency, product=p) for p in queryset]
+                try:
+                    obj_recs = get_model('core.Record').objects.bulk_create(recs)
+                except Exception as e:
+                    self.loge(e, doc, recs)
+                return HttpResponseRedirect(f'{settings.ADMIN_PATH_PREFIX}/core/doc/{doc.id}/change/')
+        self.message_user(request, errs, messages.ERROR)
+    order_from_selected_items.short_description = f'🗂 {_("create order from selected products")}'
 
 admin.site.register(Product, ProductAdmin)
 

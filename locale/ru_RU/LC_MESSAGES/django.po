@@ -688,3 +688,6 @@ msgstr "очищено иконок"
 
 msgid "clear thumbnail"
 msgstr "стереть иконоку"
+
+msgid "create order from selected products"
+msgstr "создать заказ из выбранных товаров"

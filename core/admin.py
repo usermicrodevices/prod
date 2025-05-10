@@ -141,9 +141,10 @@ class CoreBaseAdmin():
         logging.debug(msg)
 
     def loge(self, err, *args):
-        msg = f'🆘{self.__class__.__name__}.{err.__traceback__.tb_frame.f_code.co_name}::{err}::LINE={err.__traceback__.tb_lineno}'
+        msg = f'🆘{self.__class__.__name__}.{err.__traceback__.tb_frame.f_code.co_name}'
         for arg in args:
             msg += f'::{arg}'
+        msg += f'::{err}::LINE={err.__traceback__.tb_lineno}'
         logging.error(msg)
 
     def worksheet_cell_write(self, worksheet, row, col, value, type_value = None, fmt = None):

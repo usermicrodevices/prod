@@ -49,9 +49,10 @@ class CustomAbstractModel(models.Model):
         logging.warning(msg)
 
     def loge(self, err, *args):
-        msg = f'🆘{self.__class__.__name__}.{err.__traceback__.tb_frame.f_code.co_name}::{err}::LINE={err.__traceback__.tb_lineno}'
+        msg = f'🆘{self.__class__.__name__}.{err.__traceback__.tb_frame.f_code.co_name}'
         for arg in args:
             msg += f'::{arg}'
+        msg += f'::{err}::LINE={err.__traceback__.tb_lineno}'
         logging.error(msg)
 
     def get_fields_names(self):
