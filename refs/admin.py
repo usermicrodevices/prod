@@ -10,7 +10,7 @@ except:
 
 from django.utils import timezone as django_timezone
 from django.utils.translation import gettext as _
-from django.utils.html import format_html, format_html_join
+from django.utils.html import format_html, format_html_join, html_safe
 from django.urls import reverse
 from django.utils.safestring import mark_safe
 from django.contrib import admin, messages
@@ -811,20 +811,39 @@ class ProductGroupAdmin(CustomModelAdmin):
 admin.site.register(ProductGroup, ProductGroupAdmin)
 
 
+@html_safe
+class JSProduct:
+    def __str__(self):
+        return r'''<script>'use strict';
+window.onload = (event) => {
+    var elements = document.getElementsByClassName('product_count');
+    for(var i = 0; i < elements.length; i++)
+    {
+        var column = elements[i];
+        if(column && column.style)
+        {
+            var row = column.parentNode.parentNode;
+            if(row)
+                row.style.cssText = column.style.cssText;
+        }
+    }
+}</script>'''
+
+
 class ProductAdmin(CustomModelAdmin):
     __objs__ = {}
     user = None
-    list_display = ['id', 'article', 'name', 'get_barcodes', 'get_qrcodes', 'get_price', 'count', 'get_sum', 'get_tax', 'get_model', 'get_group', 'get_thumbnail', 'extinfo']
+    list_display = ['id', 'article', 'name', 'get_barcodes', 'get_qrcodes', 'get_price', 'get_count', 'get_sum', 'tax', 'model', 'group', 'get_thumbnail', 'extinfo']
     list_display_links = ('id', 'article', 'name')
-    search_fields = ('name', 'article', 'extinfo', 'barcodes__id', 'qrcodes__id', 'group__name')
+    search_fields = ('id', 'name', 'article', 'extinfo', 'barcodes__id', 'qrcodes__id', 'group__name')
     list_select_related = ('tax', 'model', 'group')
     raw_id_fields = ['images']
+    autocomplete_fields = ('tax', 'model', 'group')#, 'barcodes', 'qrcodes')
     list_filter = (ProductGroupFilter, ProductManufacturerFilter, ProductModelFilter, TaxFilter)
-    autocomplete_fields = ('tax', 'model', 'group', 'barcodes', 'qrcodes')
-    actions = ('from_xls_with_check', 'from_xls', 'to_xls', 'price_to_xls', 'barcode_to_svg', 'fix_barcodes', 'copy_unit', 'copy_cost', 'copy_price', 'copy_cost_price', 'thumbnails_from_xls', 'thumbnails_to_xls', 'thumbnail_from_first_image', 'thumbnail_clear', 'reset_cached')
+    actions = ('order_from_selected_items', 'from_xls_with_check', 'from_xls', 'to_xls', 'price_to_xls', 'barcode_to_svg', 'fix_barcodes', 'copy_unit', 'copy_cost', 'copy_price', 'copy_cost_price', 'thumbnails_from_xls', 'thumbnails_to_xls', 'thumbnail_from_first_image', 'thumbnail_clear', 'reset_cached')
 
-    #class Media:
-        #js = ['admin/js/autocomplete.js', 'admin/js/vendor/select2/select2.full.js']
+    class Media:
+        js = [JSProduct()]#(, 'admin/js/vendor/jquery/jquery.js', 'admin/js/autocomplete.js', 'admin/js/vendor/select2/select2.full.js')
 
     def check_cost_permission(self):
         if self.user.is_superuser:
@@ -844,7 +863,15 @@ class ProductAdmin(CustomModelAdmin):
         elif 'get_cost' in self.list_display:
             self.list_display.remove('get_cost')
         request = self.noselect_actions(request, ['from_xls_with_check', 'from_xls', 'thumbnails_from_xls', 'reset_cached'])
-        return super().changelist_view(request, extra_context)
+        template_response = super().changelist_view(request, extra_context)
+        #TODO change row styles on render
+        #self.logi(template_response.context_data, template_response.template_name)
+        #template = template_response.resolve_template(template_response.template_name)
+        #context = template_response.resolve_context(template_response.context_data)
+        #self.logi(template.template.source)
+        #cl = self.get_changelist_instance(request)
+        #self.logi(cl.result_list)
+        return template_response
 
     def get_form(self, request, obj=None, **kwargs):
         self.user = request.user
@@ -957,19 +984,19 @@ class ProductAdmin(CustomModelAdmin):
             min_styles |= self.get_min_styles(grp.parent, min_styles)
         return min_styles | grp.extinfo.get('min_styles', {})
 
-    def count(self, obj):
-        cnt = self.get_count_from_reg(obj)
-        color = 'color:green;' if cnt > 0 else 'color:red;'
+    def get_count(self, obj):
+        count = self.get_count_from_reg(obj)
+        color = 'color:green;' if count > 0 else 'color:red;'
         if obj.group:
             min_styles = self.get_min_styles(obj.group)
             if min_styles:
                 #for k in sorted(min_styles.keys(), reverse=True):
                 for k in min_styles.keys():
-                    if cnt <= int(k):
+                    if count <= int(k):
                         color = min_styles[k]
                         break
-        return format_html('<p><a href="{}/core/register/?rec__product={}" target="_blank" style="{}">{} {}</a></p>', settings.ADMIN_PATH_PREFIX, obj.id, color, cnt, obj.unit.label)
-    count.short_description = _('Count')
+        return format_html('<p class="product_count" id={} style="{}"><a href="{}/core/register/?rec__product={}" target="_blank" style="{}">{} {}</a></p>', obj.id, color, settings.ADMIN_PATH_PREFIX, obj.id, color, count, obj.unit.label)
+    get_count.short_description = _('Count')
 
     def get_sum(self, obj):
         count = self.get_count_from_reg(obj)
@@ -1032,7 +1059,7 @@ class ProductAdmin(CustomModelAdmin):
                 errs = f'; {e}'
                 updated_products = []
         self.message_user(request, f'📄 {_("cleared thumbnails")} {len(updated_products)}{errs}📄', messages.SUCCESS)
-    thumbnail_clear.short_description = f'📄♻️{_("clear thumbnail")}📄'
+    thumbnail_clear.short_description = f'📄♻️{_("clear thumbnail")}🚮📄'
 
     def thumbnail_from_first_image(self, request, queryset):
         result_count = 0
@@ -1612,6 +1639,29 @@ class ProductAdmin(CustomModelAdmin):
             changed = queryset.exclude(cost=it_first.cost, price=it_first.price).update(cost=it_first.cost, price=it_first.price)
         self.message_user(request, f'{_("copied")} {changed}', messages.SUCCESS)
     copy_cost_price.short_description = f'🪙 {_("copy cost and price")} ₿💲💰'
+
+    def order_from_selected_items(self, request, queryset):
+        errs = ''
+        if queryset.count() > 1:
+            get_model('core.Doc')()
+            als = 'order'
+            doc_type, created = DocType.objects.get_or_create(alias=als, defaults={'alias':als, 'name':als})
+            id_owner = request.user.default_company.id if request.user.default_company else 1
+            doc = get_model('core.Doc')(type=doc_type, owner_id=id_owner, author=request.user)
+            try:
+                doc.save()
+            except Exception as e:
+                self.loge(e)
+                errs += f'{e}'
+            else:
+                recs = [get_model('core.Record')(count=1, cost=p.cost, price=p.price, doc=doc, currency=p.currency, product=p) for p in queryset]
+                try:
+                    obj_recs = get_model('core.Record').objects.bulk_create(recs)
+                except Exception as e:
+                    self.loge(e, doc, recs)
+                return HttpResponseRedirect(f'{settings.ADMIN_PATH_PREFIX}/core/doc/{doc.id}/change/')
+        self.message_user(request, errs, messages.ERROR)
+    order_from_selected_items.short_description = f'🗂 {_("create order from selected products")}'
 
 admin.site.register(Product, ProductAdmin)
 
