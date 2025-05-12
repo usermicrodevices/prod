@@ -464,9 +464,6 @@ class CustomModelAdmin(admin.ModelAdmin):
         if 'action' in request.POST and request.POST['action'] in auto_selectable_actions:
             if not request.POST.getlist(ACTION_CHECKBOX_NAME):
                 post = request.POST.copy()
-                # p = self.model.objects.first()
-                # if p:
-                #     post.update({ACTION_CHECKBOX_NAME: str(p.id)})
                 post.update({ACTION_CHECKBOX_NAME:'0'})
                 request._set_post(post)
         return request
@@ -815,8 +812,9 @@ admin.site.register(ProductGroup, ProductGroupAdmin)
 class JSProduct:
     def __str__(self):
         return r'''<script>'use strict';
-window.onload = (event) => {
-    var elements = document.getElementsByClassName('product_count');
+document.addEventListener("DOMContentLoaded", function(event) {
+setTimeout(() => {
+    const elements = document.getElementsByClassName('product_count');
     for(var i = 0; i < elements.length; i++)
     {
         var column = elements[i];
@@ -824,26 +822,36 @@ window.onload = (event) => {
         {
             var row = column.parentNode.parentNode;
             if(row)
+            {
                 row.style.cssText = column.style.cssText;
+                const div = row.querySelectorAll("div.related-widget-wrapper[data-model-ref='tax']")[0];
+                if(div)
+                {
+                    const spans = div.getElementsByClassName('select2 select2-container select2-container--admin-autocomplete');
+                    Array.from(spans).forEach(span => {span.style.width = "100px";});
+                }
+            }
         }
     }
-}</script>'''
+});});</script>'''
 
 
 class ProductAdmin(CustomModelAdmin):
     __objs__ = {}
     user = None
-    list_display = ['id', 'article', 'name', 'get_barcodes', 'get_qrcodes', 'get_price', 'get_count', 'get_sum', 'tax', 'model', 'group', 'get_thumbnail', 'extinfo']
+    list_display = ['id', 'article', 'name', 'get_barcodes', 'get_qrcodes', 'get_price', 'get_count', 'get_sum', 'get_model', 'get_group', 'get_thumbnail', 'extinfo', 'tax']
     list_display_links = ('id', 'article', 'name')
     search_fields = ('id', 'name', 'article', 'extinfo', 'barcodes__id', 'qrcodes__id', 'group__name')
     list_select_related = ('tax', 'model', 'group')
-    raw_id_fields = ['images']
-    autocomplete_fields = ('tax', 'model', 'group')#, 'barcodes', 'qrcodes')
+    raw_id_fields = ['barcodes', 'qrcodes', 'images']
+    list_editable = ['tax']
+    autocomplete_fields = ['tax']
     list_filter = (ProductGroupFilter, ProductManufacturerFilter, ProductModelFilter, TaxFilter)
     actions = ('order_from_selected_items', 'from_xls_with_check', 'from_xls', 'to_xls', 'price_to_xls', 'barcode_to_svg', 'fix_barcodes', 'copy_unit', 'copy_cost', 'copy_price', 'copy_cost_price', 'thumbnails_from_xls', 'thumbnails_to_xls', 'thumbnail_from_first_image', 'thumbnail_clear', 'reset_cached')
 
     class Media:
-        js = [JSProduct()]#(, 'admin/js/vendor/jquery/jquery.js', 'admin/js/autocomplete.js', 'admin/js/vendor/select2/select2.full.js')
+        #css = {'screen': ['admin/css/vendor/select2/select2.css', '/static/admin/css/autocomplete.css']}
+        js = [JSProduct()]#('admin/js/vendor/jquery/jquery.js', , 'admin/js/vendor/select2/select2.full.js', 'admin/js/autocomplete.js')
 
     def check_cost_permission(self):
         if self.user.is_superuser:
@@ -864,7 +872,7 @@ class ProductAdmin(CustomModelAdmin):
             self.list_display.remove('get_cost')
         request = self.noselect_actions(request, ['from_xls_with_check', 'from_xls', 'thumbnails_from_xls', 'reset_cached'])
         template_response = super().changelist_view(request, extra_context)
-        #TODO change row styles on render
+        #TODO change row styles on template render
         #self.logi(template_response.context_data, template_response.template_name)
         #template = template_response.resolve_template(template_response.template_name)
         #context = template_response.resolve_context(template_response.context_data)
