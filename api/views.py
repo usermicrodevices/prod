@@ -266,12 +266,22 @@ class DocCashAddView(View, LogMixin):
         registered_at = data.get('registered_at', '')
         if sum_final is not None and records and registered_at:
             id_owner = data.get('owner', request.user.default_company.id if request.user.default_company else 1)
-            default_contractor = Company.objects.filter(extinfo__default_cash_contractor=True).first()
+            dtype = data.get('type', 'sale')
+            doc_type, created = DocType.objects.get_or_create(alias=dtype, defaults={'alias':dtype, 'name':dtype.title()})
+            contractor_kwargs = {}
+            if dtype == 'order':
+                contractor_kwargs['extinfo__default_order_contractor'] = True
+            elif dtype == 'order_customer':
+                contractor_kwargs['extinfo__default_order_customer_contractor'] = True
+            else:
+                contractor_kwargs['extinfo__default_cash_contractor'] = True
+            default_contractor = None
+            if contractor_kwargs:
+                default_contractor = Company.objects.filter(**contractor_kwargs).first()
             if not default_contractor and request.user.companies.count():
                 default_contractor = request.user.companies.first()
             id_contractor = data.get('contractor', default_contractor.id if default_contractor else 2)
-            dtype = data.get('type', 'sale')
-            doc_type, created = DocType.objects.get_or_create(alias=dtype, defaults={'alias':dtype, 'name':dtype.title()})
+            #################
             doc = Doc(type=doc_type, registered_at=parse_datetime(registered_at), owner_id=id_owner, contractor_id=id_contractor, author=request.user, sum_final=sum_final)
             customer = data.get('customer', {'id':None, 'name':'', 'extinfo':{}})
             if not isinstance(customer, dict):
