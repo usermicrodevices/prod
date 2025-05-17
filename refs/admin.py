@@ -677,7 +677,7 @@ admin.site.register(DocType, DocTypeAdmin)
 
 
 class CompanyAdmin(CustomModelAdmin):
-    list_display = ('id', 'name', 'created_date', 'type', 'currency')
+    list_display = ('id', 'name', 'created_date', 'type', 'currency', 'extinfo')
     list_display_links = ['id', 'name']
     search_fields = ['id', 'name', 'created_date', 'type__name',  'currency__name', 'currency__alias']
     list_select_related = ['type']
