@@ -19,8 +19,10 @@ pip install -r requirements.txt
 ./manage.py collectstatic
 ./manage.py makemigrations
 ./manage.py migrate
-./manage.py createsuperuser
+./manage.py createsuperuser --username superuser
+./manage.py default_data
 ```
+tool ```default_data``` create 2 demo users with passwords "admin":"admin" and "kassa":"kassa", later you can change it
 
 # running
 ```
