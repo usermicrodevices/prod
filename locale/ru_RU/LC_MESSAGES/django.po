@@ -691,3 +691,12 @@ msgstr "стереть иконоку"
 
 msgid "create order from selected products"
 msgstr "создать заказ из выбранных товаров"
+
+msgid "expense"
+msgstr "расход"
+
+msgid "selling"
+msgstr "доход"
+
+msgid "earnings"
+msgstr "прибыль"
