@@ -14,7 +14,7 @@ from django.utils.safestring import mark_safe
 from django.urls import path, reverse
 from django import forms
 from django.http import StreamingHttpResponse, FileResponse, HttpResponseRedirect, JsonResponse
-from django.db.models import F, Q, Min, Max, Sum, Value, Count, IntegerField, TextField, CharField, DecimalField, OuterRef, Subquery
+from django.db.models import F, Q, Min, Max, Sum, Value, Count, Case, When, CharField, DecimalField
 from django.db.models.query import QuerySet
 from django.db import connections
 from django.contrib.auth.forms import ReadOnlyPasswordHashField
@@ -22,6 +22,7 @@ from django.contrib import admin, messages
 from django.contrib.admin.models import LogEntry
 from django.contrib.admin.sites import AdminSite
 from django.contrib.admin.views.autocomplete import AutocompleteJsonView
+from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
 from django.shortcuts import render
 from django.views.generic.edit import FormView
 from django.core.cache import caches
@@ -146,6 +147,14 @@ class CoreBaseAdmin():
             msg += f'::{arg}'
         msg += f'::{err}::LINE={err.__traceback__.tb_lineno}'
         logging.error(msg)
+
+    def noselect_actions(self, request, auto_selectable_actions=[]):
+        if 'action' in request.POST and request.POST['action'] in auto_selectable_actions:
+            if not request.POST.getlist(ACTION_CHECKBOX_NAME):
+                post = request.POST.copy()
+                post.update({ACTION_CHECKBOX_NAME:'0'})
+                request._set_post(post)
+        return request
 
     def worksheet_cell_write(self, worksheet, row, col, value, type_value = None, fmt = None):
         func_write = worksheet.write
@@ -537,7 +546,7 @@ class DocAdmin(CustomModelAdmin):
     list_display_links = ('id', 'created_at', 'registered_at')
     search_fields = ('id', 'created_at', 'registered_at', 'owner__name', 'contractor__name', 'type__name', 'tax__name', 'sale_point__name', 'author__username', 'extinfo')
     list_filter = ('registered_at', 'created_at', DocTypeFilter, ContractorCompanyFilter, OwnerCompanyFilter, ProductDocRecFilter, CustomerFilter)
-    actions = ('new_incoming_from_orders', 'registration', 'unregistration', 'recalculate_final_sum', 'order_to_xls', 'sales_receipt_to_printer')
+    actions = ('new_incoming_from_orders', 'registration', 'unregistration', 'recalculate_final_sum', 'order_to_xls', 'sales_receipt_to_printer', 'earnings')
     fieldsets = [
     (
         None,
@@ -593,7 +602,7 @@ class DocAdmin(CustomModelAdmin):
         else:
             if 'get_sum_cost' in self.list_display:
                 self.list_display.remove('get_sum_cost')
-        #request = self.noselect_actions(request, [])
+        request = self.noselect_actions(request, ['earnings'])
         return super().changelist_view(request, extra_context)
 
     def get_form(self, request, obj, **kwargs):
@@ -833,5 +842,21 @@ class DocAdmin(CustomModelAdmin):
                             self.loge(e)
         self.message_user(request, f'{_("created document")} {d.id if d else 0}; {_("count records")} {count_records}', messages.SUCCESS)
     new_incoming_from_orders.short_description = f'🪄 {_("new incoming from orders")} ✨'
+
+    def earnings(self, request, queryset):
+        docs = Doc.objects
+        if queryset.count():
+            docs = queryset
+        data = docs.aggregate(
+            sum_expense = Sum(Case(When(type__income=True, then=F('sum_final')),
+                                  default=0, output_field=DecimalField())),
+            sum_selling = Sum(Case(When(type__income=False, then=F('sum_final')),
+                                  default=0, output_field=DecimalField()))
+        )
+        msg = f'{_("expense")} = {data["sum_expense"]:.2f}'
+        msg += f'; {_("selling")} = {data["sum_selling"]:.2f}'
+        msg += f'; {_("earnings")} = {data["sum_selling"]-data["sum_expense"]:.2f}'
+        self.message_user(request, mark_safe(msg), messages.SUCCESS)
+    earnings.short_description = f'💰 {_("earnings")} 💰'
 
 admin.site.register(Doc, DocAdmin)
