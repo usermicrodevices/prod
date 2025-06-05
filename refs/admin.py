@@ -28,6 +28,7 @@ from django.views.generic.edit import FormView
 from django.core.cache import caches
 from django.conf import settings
 from django.apps import apps as django_apps
+from django.template import Context, Template
 
 from .models import PrintTemplates, Unit, Currency, Country, Region, City, Tax, CompanyType, Company, SalePoint, Manufacturer, ProductModel, BarCode, QrCode, DocType, ProductGroup, Product, Customer, ProductImage
 from users.models import User
@@ -847,7 +848,23 @@ class ProductAdmin(CustomModelAdmin):
     list_editable = ['tax']
     autocomplete_fields = ['tax']
     list_filter = (ProductGroupFilter, ProductManufacturerFilter, ProductModelFilter, TaxFilter)
-    actions = ('order_from_selected_items', 'from_xls_with_check', 'from_xls', 'to_xls', 'price_to_xls', 'barcode_to_svg', 'fix_barcodes', 'copy_unit', 'copy_cost', 'copy_price', 'copy_cost_price', 'thumbnails_from_xls', 'thumbnails_to_xls', 'thumbnail_from_first_image', 'thumbnail_clear', 'reset_cached')
+    actions = ('order_from_selected_items',
+        'from_xls_with_check',
+        'from_xls',
+        'to_xls',
+        'price_to_xls',
+        'barcode_to_svg',
+        'qr_to_svg',
+        'fix_barcodes',
+        'copy_unit',
+        'copy_cost',
+        'copy_price',
+        'copy_cost_price',
+        'thumbnails_from_xls',
+        'thumbnails_to_xls',
+        'thumbnail_from_first_image',
+        'thumbnail_clear',
+        'reset_cached')
 
     class Media:
         #css = {'screen': ['admin/css/vendor/select2/select2.css', '/static/admin/css/autocomplete.css']}
@@ -1568,11 +1585,11 @@ class ProductAdmin(CustomModelAdmin):
                         else:
                             name_at_top_x = '0mm'
                     name_wrapped = f'</tspan><tspan x="{name_at_top_x}" dy="{name_at_top_h}pt">'.join(wrap(it.name, text_wrapped_symbols)).join([f'<tspan x="{name_at_top_x}" dy="{name_at_top_h}pt">','</tspan>'])
-                    svg_top = f'<svg id="top" xmlns="http://www.w3.org/2000/svg" width="{eval_dim(svg_width,.5)}" height="{eval_dim(svg_height,1.911)}"><g id="top-g"><text id="top-text" x="{name_at_top_x}mm" style="font-size:{font_size}pt;text-anchor:middle;{font_style_ext}">{name_wrapped}</text></g>'
+                    svg_top = f'<svg id="top" xmlns="http://www.w3.org/2000/svg" width="{eval_dim(svg_width,.5)}" height="{eval_dim(svg_height,1.911)}"><g id="top-g"><text id="top-text" x="{name_at_top_x}" style="font-size:{font_size}pt;text-anchor:middle;{font_style_ext}">{name_wrapped}</text></g>'
                     svgs += f'<p class="page-pad">{svg_top}{svg.replace('<svg', f'<svg y="{name_at_top_h}mm"')}</svg></p>'
                 else:
                     svgs += f'<p class="page-pad">{svg}</p>'
-        svgs = f'<div id="section-to-print"><style>@media {css_media_orientation} print{{html body{{visibility:hidden;height:auto;margin:0;padding:0;}} .content{{position:absolute;top:0;}} .messagelist{{margin:0;padding:0;}} #section-to-print{{text-align:center;background-color:white;width:0;display:flex;flex-direction:column;visibility:visible;position:absolute;left:0;top:0;}}}} @page{{size: {svg_width} {svg_height} {css_media_page_size_ext};margin:0;}} .page-pad{{page-break-after:always;margin:0;padding:0;}} .page-pad:last-of-type{{page-break-after:avoid!important;}}{css_media_ext}</style>{print_button}{print_script}' + re.sub('(<!--.*?-->)', '', svgs, flags=re.DOTALL) + '</div>'
+        svgs = f'<div id="section-to-print"><style>@media {css_media_orientation} print{{html body{{visibility:hidden;height:auto;margin:0;padding:0;}} .content{{position:absolute;top:0;}} .messagelist{{margin:0;padding:0;}} #section-to-print{{text-align:center;background-color:white;width:0;display:flex;flex-direction:column;visibility:visible;position:absolute;left:0;top:0;}}}} @page{{size: {svg_width} {svg_height} {css_media_page_size_ext};margin:0;}} .page-pad{{break-after:page;margin:0;padding:0;}} .page-pad:last-of-type{{break-after:avoid!important;}}{css_media_ext}</style>{print_button}{print_script}' + re.sub('(<!--.*?-->)', '', svgs, flags=re.DOTALL) + '</div>'
         self.message_user(request, mark_safe(svgs), messages.SUCCESS)
     barcode_to_svg.short_description = f'🖶{_("print barcode as SVG")}🖼'
 
@@ -1670,6 +1687,27 @@ class ProductAdmin(CustomModelAdmin):
                 return HttpResponseRedirect(f'{settings.ADMIN_PATH_PREFIX}/core/doc/{doc.id}/change/')
         self.message_user(request, errs, messages.ERROR)
     order_from_selected_items.short_description = f'🗂 {_("create order from selected products")}'
+
+    def qr_to_svg(self, request, queryset):
+        template, created = get_model('refs.PrintTemplates').objects.get_or_create(alias='refs.qrcode', defaults=settings.DEAFAULT_QR_PRINT_TEMPLATE)
+        if not template:
+            self.message_user(request, _('please add qrcode printer template first'), messages.ERROR)
+            return
+        import qrcode
+        import qrcode.image.svg
+        svgs = ''
+        for it in queryset:
+            code_value = it.qrcodes.first()
+            if not code_value:
+                code_value = it.barcodes.first()
+            if code_value:
+                svg = qrcode.make(code_value, image_factory=qrcode.image.svg.SvgPathImage, border=template.extinfo.get('qr_border', 0), box_size=template.extinfo.get('qr_box_size', 10), version=template.extinfo.get('qr_version', 1))
+                svgs += Template(template.content).render(Context({'svg':svg.to_string().decode('utf-8')}))
+        #if 'script' in template.extinfo:
+            #svgs = template.extinfo['script']
+        svgs = f'<div id="section-to-print"><style>{template.extinfo["css_media_style"]}</style>' + re.sub('(<!--.*?-->)', '', svgs, flags=re.DOTALL) + f'</div>'
+        self.message_user(request, mark_safe(svgs), messages.SUCCESS)
+    qr_to_svg.short_description = f'🖶{_("print QR as SVG")}㊙️'
 
 admin.site.register(Product, ProductAdmin)
 

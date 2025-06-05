@@ -536,6 +536,9 @@ msgstr "пересчитать финальную сумму"
 msgid "print barcode as SVG"
 msgstr "печатать штрихкод как SVG"
 
+msgid "print QR as SVG"
+msgstr "печатать QR как SVG"
+
 msgid "updated"
 msgstr "обновлено"
 
