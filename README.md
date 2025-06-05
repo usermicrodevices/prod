@@ -45,3 +45,63 @@ sudo apt install texlive-xetex, wkhtmltopdf, pandoc
 ```
 sudo apt install libpng-dev libjpeg-dev libtiff-dev imagemagick
 ```
+
+# OPTIONAL use qrcode printer
+```
+pip install qrcode
+```
+
+# SOCIALS
+[telegram](https://t.me/github_prod)
+
+
+# Brief description
+
+1. Ability to divide users by roles,
+roles are created from any set of fields and permissions of system models.
+Permissions are grouped and the group is assigned to a role.
+In the basic version, 2 roles are configured: administrator and cashier.
+
+2. Adding reference information about products, companies, points of sale (warehouses), customers.
+Generation and printing of price tags, barcodes, QR codes. Printed forms are customizable through templates.
+Ability to add any reference information for further use in searching and filtering.
+The product stores an unlimited number of images, icon generation from the first image.
+
+3. Documents are divided into types created by the user, for example: receipts, expenses, orders, balances.
+Each type has accounting attributes of receipt or expense, auto-registration for settlements, etc.
+Printed forms are customized and stored in the print templates section.
+Excel uploads and downloads are pre-configured, but can be quickly cloned into new ones.
+
+4. REST API for working with cash register equipment: POS terminals, scales, etc.
+The multi-platform client supports working with scales out of the box.
+The mobile version includes a barcode / QR code scanner.
+The desktop version works with keyboard scanners in quick search mode.
+Support for offline work with periodic synchronization with the server.
+Maintaining a customer directory.
+Adding customer orders, pre-ordering the supplier.
+
+
+# Краткое описание
+
+1. Возможность разделять пользователей по ролям,
+роли создаются из любого набора полей и разрешений моделей системы.
+Разрешения группируются и группа присваивается роли.
+В базовой версии настроены 2 роли: администратор и кассир.
+
+2. Добавление справочной информации о товарах, компаниях, точках продаж (складах), покупателях.
+Генерация и печать ценников, штрихкодов, qr-кодов. Печатные формы настраиваемые через шаблоны.
+Возможность добавлять любую справочную информацию для дальнейшего использования в поиске и фильтрации.
+Товар хранит неограниченное количество изображений, генерация иконки из первого изображения.
+
+3. Документы делятся на типы созданные пользователем, например: приходные, расходные, заказы, остатки.
+Каждый тип имеет признаки учёта приход или расход, авто-регистрация для расчётов и т.д.
+Печатные формы настраиваются и хранятся в разделе шаблонов печати.
+Выгрузки и загрузки в Excel преднастроенные, но могут быть быстро клонированы в новые.
+
+4. REST API для работы с кассовым оборудованием: POS терминалы, весы и т.д.
+Мультиплатформенный клиент поддерживает работу с весами из коробки.
+Мобильная версия включает сканер штрихкодов / qr-кодов.
+Десктоп версия работает с клавиатурными сканерами в режиме быстрого поиска.
+Поддержка оффлайн работы с периодической синхронизацией с сервером.
+Ведение справочника покупателей.
+Добавление заказов покупателей, предварительный заказ поставщику.
