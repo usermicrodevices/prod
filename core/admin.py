@@ -16,7 +16,7 @@ from django import forms
 from django.http import StreamingHttpResponse, FileResponse, HttpResponseRedirect, JsonResponse
 from django.db.models import F, Q, Min, Max, Sum, Value, Count, Case, When, CharField, DecimalField
 from django.db.models.query import QuerySet
-from django.db import connections
+from django.db import connections, transaction
 from django.contrib.auth.forms import ReadOnlyPasswordHashField
 from django.contrib import admin, messages
 from django.contrib.admin.models import LogEntry
@@ -546,7 +546,7 @@ class DocAdmin(CustomModelAdmin):
     list_display_links = ('id', 'created_at', 'registered_at')
     search_fields = ('id', 'created_at', 'registered_at', 'owner__name', 'contractor__name', 'type__name', 'tax__name', 'sale_point__name', 'author__username', 'extinfo')
     list_filter = ('registered_at', 'created_at', DocTypeFilter, ContractorCompanyFilter, OwnerCompanyFilter, ProductDocRecFilter, CustomerFilter)
-    actions = ('new_incoming_from_orders', 'registration', 'unregistration', 'recalculate_final_sum', 'order_to_xls', 'sales_receipt_to_printer', 'earnings')
+    actions = ('new_incoming_from_orders', 'registration', 'unregistration', 'recalculate_final_sum', 'order_to_xls', 'sales_receipt_to_printer', 'earnings', 'merge_items')
     fieldsets = [
     (
         None,
@@ -858,5 +858,96 @@ class DocAdmin(CustomModelAdmin):
         msg += f'; {_("earnings")} = {data["sum_selling"]-data["sum_expense"]:.2f}'
         self.message_user(request, mark_safe(msg), messages.SUCCESS)
     earnings.short_description = f'💰 {_("earnings")} 💰'
+
+    @transaction.atomic
+    def merge_items(self, request, queryset):
+        if queryset.count() < 2:
+            self.message_user(request, _('Please select more than one item'), messages.SUCCESS)
+        doc_main = queryset.first()
+        msg = f'{_("final document")} {doc_main.id}'
+        recs = Record.objects.filter(doc_id=doc_main.id)
+        docs_extra = queryset.filter(type_id=doc_main.type_id).exclude(id=doc_main.id)
+        recs_extra = Record.objects.filter(doc__in=docs_extra.values_list('id'))
+        recs_moved = []
+        recs_deleted = []
+        sid = transaction.savepoint()
+        for rec in recs_extra:
+            if rec.id in recs_deleted:
+                continue
+            rec_main = recs.filter(product_id=rec.product_id).first()
+            if rec_main:
+                rec_main.count += rec.count
+                try:
+                    rec_main.save(update_fields=['count'])
+                except Exception as e:
+                    transaction.savepoint_rollback(sid)
+                    self.loge(e, rec_main.id, rec_main.product)
+                    msg += f'; {e}, {rec_main.id}, {rec_main.product}'
+                    self.message_user(request, mark_safe(msg), messages.ERROR)
+                    return
+                else:
+                    recs_deleted.append(rec.id)
+            else:
+                recs_moved.append(rec.id)
+                rs = recs_extra.filter(product_id=rec.product_id).exclude(id=rec.id)
+                if rs.count():
+                    count_extra = rs.aggregate(cnt = Sum('count'))
+                    if settings.DEBUG:
+                        self.logd('FOUND DOUBLE RECORDS', rs.values_list('id'))
+                        self.logd('COUNT', rec.count)
+                        self.logd('COUNT_EXTRA', count_extra)
+                    rec.count += count_extra['cnt']
+                    try:
+                        rec.save(update_fields=['count'])
+                    except Exception as e:
+                        transaction.savepoint_rollback(sid)
+                        self.loge(e, rec.id, rec.product)
+                        msg += f'; {e}, {rec.id}, {rec.product}'
+                        self.message_user(request, mark_safe(msg), messages.ERROR)
+                        return
+                    else:
+                        recs_deleted.extend(rs.values_list('id', flat=True))
+        if recs_moved:
+            try:
+                res = Record.objects.filter(id__in=recs_moved).update(doc_id=doc_main.id)
+            except Exception as e:
+                self.loge(e)
+                msg += f'; {e}'
+            else:
+                msg += f'; {_("records moved")} {res}'
+        if recs_deleted:
+            try:
+                res = Record.objects.filter(id__in=recs_deleted).delete()
+            except Exception as e:
+                self.loge(e)
+                msg += f'; {e}'
+            else:
+                msg += f'; {_("records deleted")} {res}'
+        not_empty_extra_docs = recs_extra.values_list('doc_id', flat=True)
+        if len(not_empty_extra_docs):
+            msg += f'; {_("can't delete documents")} {not_empty_extra_docs}'
+        else:
+            docs_extra_for_delete = list(docs_extra.only('id').values_list('id', flat=True))
+            try:
+                res = docs_extra.delete()
+            except Exception as e:
+                self.loge(e)
+                msg += f'; {e}'
+            else:
+                msg += f'; {_("documents deleted")} {docs_extra_for_delete} {res[1]}'
+        value_sum_final = None
+        if doc_main.type.income:
+            value_sum_final = Record.objects.filter(doc=doc_main).aggregate(sum_final=Sum(F('count') * F('cost')))['sum_final']
+        else:
+            value_sum_final = Record.objects.filter(doc=doc_main).aggregate(sum_final=Sum(F('count') * F('price')))['sum_final']
+        if value_sum_final is not None and doc_main.sum_final != value_sum_final:
+            try:
+                Doc.objects.filter(id=doc_main.id).update(sum_final=value_sum_final)
+            except Exception as e:
+                self.loge(e)
+                msg += f'; {e}'
+        transaction.savepoint_commit(sid)
+        self.message_user(request, mark_safe(msg), messages.SUCCESS)
+    merge_items.short_description = f'🫕 {_("combine elements and remove unnecessary ones")} 🫕'
 
 admin.site.register(Doc, DocAdmin)
