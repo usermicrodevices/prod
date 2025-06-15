@@ -66,11 +66,14 @@ In the basic version, 2 roles are configured: administrator and cashier.
 Generation and printing of price tags, barcodes, QR codes. Printed forms are customizable through templates.
 Ability to add any reference information for further use in searching and filtering.
 The product stores an unlimited number of images, icon generation from the first image.
+Additional tools include barcode correction and price copying.
 
 3. Documents are divided into types created by the user, for example: receipts, expenses, orders, balances.
 Each type has accounting attributes of receipt or expense, auto-registration for settlements, etc.
 Printed forms are customized and stored in the print templates section.
+Print form templates are customized in HTML format, include CSS.
 Excel uploads and downloads are pre-configured, but can be quickly cloned into new ones.
+Additional tools include viewing profits and combining multiple documents of the same type into a single document.
 
 4. REST API for working with cash register equipment: POS terminals, scales, etc.
 The multi-platform client supports working with scales out of the box.
@@ -80,6 +83,8 @@ Support for offline work with periodic synchronization with the server.
 Maintaining a customer directory.
 Adding customer orders, pre-ordering the supplier.
 
+5. This software can be used as a separate ERP/CRM system,
+or implemented or integrated with other accounting (retail, warehouse and etc.) systems.
 
 # Краткое описание
 
@@ -92,11 +97,14 @@ Adding customer orders, pre-ordering the supplier.
 Генерация и печать ценников, штрихкодов, qr-кодов. Печатные формы настраиваемые через шаблоны.
 Возможность добавлять любую справочную информацию для дальнейшего использования в поиске и фильтрации.
 Товар хранит неограниченное количество изображений, генерация иконки из первого изображения.
+Дополнительные инструменты содержат исправление штрихкодов и копирование цен.
 
 3. Документы делятся на типы созданные пользователем, например: приходные, расходные, заказы, остатки.
 Каждый тип имеет признаки учёта приход или расход, авто-регистрация для расчётов и т.д.
 Печатные формы настраиваются и хранятся в разделе шаблонов печати.
+Шаблоны печатных форм настраиваются в формате HTML, включая CSS.
 Выгрузки и загрузки в Excel преднастроенные, но могут быть быстро клонированы в новые.
+Дополнительные инструменты содержат просмотр прибыли и объединение нескольких документов одного типа в общий документ.
 
 4. REST API для работы с кассовым оборудованием: POS терминалы, весы и т.д.
 Мультиплатформенный клиент поддерживает работу с весами из коробки.
@@ -105,3 +113,6 @@ Adding customer orders, pre-ordering the supplier.
 Поддержка оффлайн работы с периодической синхронизацией с сервером.
 Ведение справочника покупателей.
 Добавление заказов покупателей, предварительный заказ поставщику.
+
+5. Это программное обеспечение можно использовать как отдельную ERP/CRM систему,
+так и внедрять или интегрировать вместе с другими учётными (торговыми, складскими и пр.) системами.

@@ -703,3 +703,24 @@ msgstr "доход"
 
 msgid "earnings"
 msgstr "прибыль"
+
+msgid "combine elements and remove unnecessary ones"
+msgstr "объединить элементы и удалить лишние"
+
+msgid "Please select more than one item"
+msgstr "Пожалуйста, выберите более одного элемента"
+
+msgid "final document"
+msgstr "финальный документ"
+
+msgid "records moved"
+msgstr "записей перемещено"
+
+msgid "records deleted"
+msgstr "записей удалено"
+
+msgid "can't delete documents"
+msgstr "нельзя удалить документы"
+
+msgid "documents deleted"
+msgstr "документов удалено"
