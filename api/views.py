@@ -1,4 +1,5 @@
 import json, logging, locale, re, sys
+from decimal import Decimal
 
 from django.http import JsonResponse, HttpResponse
 from django.views import View
@@ -264,7 +265,13 @@ class DocCashAddView(View, LogMixin):
         sum_final = data.get('sum_final', None)
         records = data.get('records', [])
         registered_at = data.get('registered_at', '')
+        def reduce_int_part(v:Decimal):
+            if v > Decimal(999999999999):
+                d = f'{v}'
+                return Decimal(f'{d[:12]}.{d[12:]}')
+            return v
         if sum_final is not None and records and registered_at:
+            sum_final = reduce_int_part(Decimal(sum_final))
             id_owner = data.get('owner', request.user.default_company.id if request.user.default_company else 1)
             dtype = data.get('type', 'sale')
             doc_type, created = DocType.objects.get_or_create(alias=dtype, defaults={'alias':dtype, 'name':dtype.title()})
@@ -310,18 +317,25 @@ class DocCashAddView(View, LogMixin):
                             doc.customer_id = dbcustomer.id
             recs = []
             for r in records:
+                id_product = r['product']
                 try:
-                    p = Product.objects.get(pk=r['product'])
+                    p = Product.objects.get(pk=id_product)
+                except Product.DoesNotExist as e:
+                    self.logw(e, r)
+                    try:
+                        Product(id=id_product, name=f'unknown-product-{id_product}', price=r['price']).save()
+                    except Exception as e:
+                        self.loge(e, r)
                 except Exception as e:
-                    self.loge(e, r)
+                    self.loge(e, r, records)
                     return JsonResponse({'result':f'error; {r}; {e}'}, status=500)
                 else:
-                    recs.append(Record(count=r['count'], cost=p.cost, price=r['price'], doc=doc, currency=p.currency, product=p))
+                    recs.append(Record(count=reduce_int_part(Decimal(r['count'])), cost=p.cost, price=reduce_int_part(Decimal(r['price'])), doc=doc, currency=p.currency, product=p))
             if recs:
                 try:
                     doc.save()
                 except Exception as e:
-                    self.loge(e)
+                    self.loge(e, data)
                     return JsonResponse({'result':f'error: {e}'}, status=500)
                 else:
                     try:
