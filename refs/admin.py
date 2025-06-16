@@ -1701,10 +1701,10 @@ class ProductAdmin(CustomModelAdmin):
             if not code_value:
                 code_value = it.barcodes.first()
             if code_value:
-                svg = qrcode.make(code_value, image_factory=qrcode.image.svg.SvgPathImage, border=template.extinfo.get('qr_border', 0), box_size=template.extinfo.get('qr_box_size', 10), version=template.extinfo.get('qr_version', 1))
+                svg = qrcode.make(code_value.id, image_factory=qrcode.image.svg.SvgPathImage, border=template.extinfo.get('qr_border', 0), box_size=template.extinfo.get('qr_box_size', 10), version=template.extinfo.get('qr_version', 1))
                 svgs += Template(template.content).render(Context({'svg':svg.to_string().decode('utf-8')}))
-        #if 'script' in template.extinfo:
-            #svgs = template.extinfo['script']
+        if 'script' in template.extinfo:
+            svgs += template.extinfo['script']
         svgs = f'<div id="section-to-print"><style>{template.extinfo["css_media_style"]}</style>' + re.sub('(<!--.*?-->)', '', svgs, flags=re.DOTALL) + f'</div>'
         self.message_user(request, mark_safe(svgs), messages.SUCCESS)
     qr_to_svg.short_description = f'🖶{_("print QR as SVG")}㊙️'
