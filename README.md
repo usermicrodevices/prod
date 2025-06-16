@@ -84,7 +84,8 @@ Maintaining a customer directory.
 Adding customer orders, pre-ordering the supplier.
 
 5. This software can be used as a separate ERP/CRM system,
-or implemented or integrated with other accounting (retail, warehouse and etc.) systems.
+or implemented or integrated with other accounting (retail,
+inventory management, warehouse and etc.) systems.
 
 # Краткое описание
 
@@ -115,4 +116,5 @@ or implemented or integrated with other accounting (retail, warehouse and etc.) 
 Добавление заказов покупателей, предварительный заказ поставщику.
 
 5. Это программное обеспечение можно использовать как отдельную ERP/CRM систему,
-так и внедрять или интегрировать вместе с другими учётными (торговыми, складскими и пр.) системами.
+так и внедрять или интегрировать вместе с другими учётными (розничная торговля,
+управление запасами, складскими и пр.) системами.
