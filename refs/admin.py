@@ -608,30 +608,31 @@ admin.site.register(Country, CountryAdmin)
 class RegionAdmin(CustomModelAdmin):
     list_display = ('id', 'name', 'country')
     list_display_links = ['name']
-    search_fields = ['id', 'name', 'country__name']
+    list_editable = ['country']
     list_select_related = ['country']
-    list_filter = (CountryFilter,)
+    list_filter = [CountryFilter]
+    search_fields = ['id', 'name', 'country__name']
     autocomplete_fields = ['country']
-    raw_id_fields = ['country']
 admin.site.register(Region, RegionAdmin)
 
 
 class CityAdmin(CustomModelAdmin):
     list_display = ('id', 'name', 'region')
     list_display_links = ['id', 'name']
-    search_fields = ['id', 'name', 'region__name', 'region__country__name']
-    list_select_related = ['region__country']
+    list_editable = ['region']
+    list_select_related = ['region', 'region__country']
     list_filter = (CountryFilter, RegionFilter)
+    search_fields = ['id', 'name', 'region__name', 'region__country__name']
     autocomplete_fields = ['region']
-    raw_id_fields = ['region']
 admin.site.register(City, CityAdmin)
 
 
 class ManufacturerAdmin(CustomModelAdmin):
     list_display = ('id', 'name', 'city', 'get_region', 'get_country')
     list_display_links = ('id', 'name')
-    search_fields = ('id', 'name', 'city__name', 'city__region__name', 'city__region__country__name')
+    list_editable = ['city']
     list_filter = (CountryFilter, RegionFilter, CityFilter)
+    search_fields = ('id', 'name', 'city__name', 'city__region__name', 'city__region__country__name')
     autocomplete_fields = ['city']
 
     def get_region(self, obj):
@@ -654,7 +655,11 @@ admin.site.register(Manufacturer, ManufacturerAdmin)
 class ProductModelAdmin(CustomModelAdmin):
     list_display = ('id', 'name', 'manufacturer')
     list_display_links = ('id', 'name')
+    list_editable = ['manufacturer']
+    list_select_related = ['manufacturer']
     search_fields = ('id', 'name', 'manufacturer__name')
+    autocomplete_fields = ['manufacturer']
+    list_filter = [ProductManufacturerFilter]
 admin.site.register(ProductModel, ProductModelAdmin)
 
 
@@ -1542,6 +1547,10 @@ class ProductAdmin(CustomModelAdmin):
     thumbnails_to_xls.short_description = f'📄⚔{_("export thumbnails to XLS file")}↘📄'
 
     def barcode_to_svg(self, request, queryset):
+        template, created = get_model('refs.PrintTemplates').objects.get_or_create(alias='refs.barcode', defaults=settings.DEFAULT_BARCODE_PRINT_TEMPLATE)
+        if not template:
+            self.message_user(request, _('please add barcode printer template first'), messages.ERROR)
+            return
         from textwrap import wrap
         from barcode import EAN13
         from barcode.writer import SVGWriter
@@ -1552,18 +1561,18 @@ class ProductAdmin(CustomModelAdmin):
         svgs = ''
         svg_width = '30mm'
         svg_height = '20mm'
-        font_size = settings.ADMIN_EAN13_RENDER_OPTIONS.get('font_size', 8)
-        font_style_ext = settings.ADMIN_EAN13_RENDER_OPTIONS.get('font_style_ext', '')
-        text_wrapped_symbols = settings.ADMIN_EAN13_RENDER_OPTIONS.get('text_wrapped_symbols', 15)
-        show_name = settings.ADMIN_EAN13_RENDER_OPTIONS.get('show_name', False)
-        name_at_top = settings.ADMIN_EAN13_RENDER_OPTIONS.get('name_at_top', False)
-        name_at_top_h = settings.ADMIN_EAN13_RENDER_OPTIONS.get('name_at_top_h', font_size)
-        name_at_top_x = settings.ADMIN_EAN13_RENDER_OPTIONS.get('name_at_top_x', 'center')
-        css_media_orientation = settings.ADMIN_EAN13_RENDER_OPTIONS.get('css_media_orientation', '')
-        css_media_page_size_ext = settings.ADMIN_EAN13_RENDER_OPTIONS.get('css_media_page_size_ext', 'landscape;page-orientation:rotate-right')
-        css_media_ext = settings.ADMIN_EAN13_RENDER_OPTIONS.get('css_media_ext', '')
-        print_button = settings.ADMIN_EAN13_RENDER_OPTIONS.get('print_button', '')
-        print_script = settings.ADMIN_EAN13_RENDER_OPTIONS.get('print_script', '')
+        font_size = template.extinfo.get('font_size', 8)
+        font_style_ext = template.extinfo.get('font_style_ext', '')
+        text_wrapped_symbols = template.extinfo.get('text_wrapped_symbols', 15)
+        show_name = template.extinfo.get('show_name', False)
+        name_at_top = template.extinfo.get('name_at_top', False)
+        name_at_top_h = template.extinfo.get('name_at_top_h', font_size)
+        name_at_top_x = template.extinfo.get('name_at_top_x', 'center')
+        css_media_orientation = template.extinfo.get('css_media_orientation', '')
+        css_media_page_size_ext = template.extinfo.get('css_media_page_size_ext', 'landscape;page-orientation:rotate-right')
+        css_media_ext = template.extinfo.get('css_media_ext', '')
+        print_button = template.extinfo.get('print_button', '')
+        print_script = template.extinfo.get('print_script', '')
         for it in queryset:
             bcode_value = it.barcodes.first()
             if bcode_value:
@@ -1571,9 +1580,9 @@ class ProductAdmin(CustomModelAdmin):
                 svgwriter = SVGWriter()
                 ean = EAN13(bcode_value.id, writer=svgwriter)
                 if show_name:
-                    svg = ean.render(settings.ADMIN_EAN13_RENDER_OPTIONS, name_wrapped).decode('UTF-8').replace('\n', '')
+                    svg = ean.render(template.extinfo, name_wrapped).decode('UTF-8').replace('\n', '')
                 else:
-                    svg = ean.render(settings.ADMIN_EAN13_RENDER_OPTIONS).decode('UTF-8').replace('\n', '')
+                    svg = ean.render(template.extinfo).decode('UTF-8').replace('\n', '')
                 if settings.DEBUG:
                     self.logi(bcode_value.id, ean.to_ascii())
                 if name_at_top and not show_name:
@@ -1587,9 +1596,8 @@ class ProductAdmin(CustomModelAdmin):
                             name_at_top_x = '0mm'
                     name_wrapped = f'</tspan><tspan x="{name_at_top_x}" dy="{name_at_top_h}pt">'.join(wrap(it.name, text_wrapped_symbols)).join([f'<tspan x="{name_at_top_x}" dy="{name_at_top_h}pt">','</tspan>'])
                     svg_top = f'<svg id="top" xmlns="http://www.w3.org/2000/svg" width="{eval_dim(svg_width,.5)}" height="{eval_dim(svg_height,1.911)}"><g id="top-g"><text id="top-text" x="{name_at_top_x}" style="font-size:{font_size}pt;text-anchor:middle;{font_style_ext}">{name_wrapped}</text></g>'
-                    svgs += f'<p class="page-pad">{svg_top}{svg.replace('<svg', f'<svg y="{name_at_top_h}mm"')}</svg></p>'
-                else:
-                    svgs += f'<p class="page-pad">{svg}</p>'
+                    svg = svg_top + svg.replace('<svg', f'<svg y="{name_at_top_h}mm"')
+                svgs += Template(template.content).render(Context({'svg':svg}))
         svgs = f'<div id="section-to-print"><style>@media {css_media_orientation} print{{html body{{visibility:hidden;height:auto;margin:0;padding:0;}} .content{{position:absolute;top:0;}} .messagelist{{margin:0;padding:0;}} #section-to-print{{text-align:center;background-color:white;width:0;display:flex;flex-direction:column;visibility:visible;position:absolute;left:0;top:0;}}}} @page{{size: {svg_width} {svg_height} {css_media_page_size_ext};margin:0;}} .page-pad{{break-after:page;margin:0;padding:0;}} .page-pad:last-of-type{{break-after:avoid!important;}}{css_media_ext}</style>{print_button}{print_script}' + re.sub('(<!--.*?-->)', '', svgs, flags=re.DOTALL) + '</div>'
         self.message_user(request, mark_safe(svgs), messages.SUCCESS)
     barcode_to_svg.short_description = f'🖶{_("print barcode as SVG")}🖼'
