@@ -67,6 +67,8 @@ Generation and printing of price tags, barcodes, QR codes. Printed forms are cus
 Ability to add any reference information for further use in searching and filtering.
 The product stores an unlimited number of images, icon generation from the first image.
 Additional tools include barcode correction and price copying.
+For ease of filtering and searching in the product directory,
+it is necessary to fill out the directory of manufacturers and product models.
 
 3. Documents are divided into types created by the user, for example: receipts, expenses, orders, balances.
 Each type has accounting attributes of receipt or expense, auto-registration for settlements, etc.
@@ -99,6 +101,8 @@ inventory management, warehouse and etc.) systems.
 Возможность добавлять любую справочную информацию для дальнейшего использования в поиске и фильтрации.
 Товар хранит неограниченное количество изображений, генерация иконки из первого изображения.
 Дополнительные инструменты содержат исправление штрихкодов и копирование цен.
+Для добства фильтрации и поиска в справочнике товаров, необходимо заполнять
+справочник производителей и моделей продукции
 
 3. Документы делятся на типы созданные пользователем, например: приходные, расходные, заказы, остатки.
 Каждый тип имеет признаки учёта приход или расход, авто-регистрация для расчётов и т.д.
