@@ -846,7 +846,7 @@ class ProductAdmin(CustomModelAdmin):
     list_select_related = ('tax', 'model', 'group')
     raw_id_fields = ['barcodes', 'qrcodes', 'images']
     list_editable = ['tax']
-    autocomplete_fields = ['tax']
+    autocomplete_fields = ['model', 'tax', 'group']
     list_filter = (ProductGroupFilter, ProductManufacturerFilter, ProductModelFilter, TaxFilter)
     actions = ('order_from_selected_items',
         'from_xls_with_check',
