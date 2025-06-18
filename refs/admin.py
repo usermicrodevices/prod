@@ -856,6 +856,7 @@ class ProductAdmin(CustomModelAdmin):
         'barcode_to_svg',
         'qr_to_svg',
         'fix_barcodes',
+        'copy_name_to_ext_label',
         'copy_unit',
         'copy_cost',
         'copy_price',
@@ -1708,6 +1709,26 @@ class ProductAdmin(CustomModelAdmin):
         svgs = f'<div id="section-to-print"><style>{template.extinfo["css_media_style"]}</style>' + re.sub('(<!--.*?-->)', '', svgs, flags=re.DOTALL) + f'</div>'
         self.message_user(request, mark_safe(svgs), messages.SUCCESS)
     qr_to_svg.short_description = f'🖶{_("print QR as SVG")}㊙️'
+
+    def copy_name_to_ext_label(self, request, queryset):
+        msg = '-'
+        updated_items = []
+        for it in queryset:
+            label = it.extinfo.get('label', None)
+            if not label:
+                it.extinfo['label'] = it.name
+                updated_items.append(it)
+        if updated_items:
+            msg = _('updated')
+            try:
+                res = Product.objects.bulk_update(updated_items, ['extinfo'])
+            except Exception as e:
+                self.loge(e)
+                msg += f' {e}'
+            else:
+                msg += f' {res}'
+        self.message_user(request, mark_safe(msg), messages.SUCCESS)
+    copy_name_to_ext_label.short_description = f'🏷️{_("copy name to extra label")}🏷️'
 
 admin.site.register(Product, ProductAdmin)
 
