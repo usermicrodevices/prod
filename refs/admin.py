@@ -840,9 +840,9 @@ setTimeout(() => {
 class ProductAdmin(CustomModelAdmin):
     __objs__ = {}
     user = None
-    list_display = ['id', 'article', 'name', 'get_barcodes', 'get_qrcodes', 'get_price', 'get_count', 'get_sum', 'get_model', 'get_group', 'get_thumbnail', 'extinfo', 'tax']
+    list_display = ['id', 'article', 'name', 'get_barcodes', 'get_qrcodes', 'get_price', 'get_count', 'get_sum', 'get_prod_model', 'get_group', 'get_thumbnail', 'extinfo', 'tax']
     list_display_links = ('id', 'article', 'name')
-    search_fields = ('id', 'name', 'article', 'extinfo', 'barcodes__id', 'qrcodes__id', 'group__name')
+    search_fields = ('id', 'name', 'article', 'extinfo', 'barcodes__id', 'qrcodes__id', 'group__name', 'model__name', 'model__manufacturer__name')
     list_select_related = ('tax', 'model', 'group')
     raw_id_fields = ['barcodes', 'qrcodes', 'images']
     list_editable = ['tax']
@@ -1041,14 +1041,14 @@ class ProductAdmin(CustomModelAdmin):
     get_tax.short_description = _('Tax')
     get_tax.admin_order_field = 'tax'
 
-    def get_model(self, obj):
+    def get_prod_model(self, obj):
         o = obj.model
         if not o:
             return ''
         m = o._meta
-        return format_html('<a href="{}?id={}" target="_blank">{}</a>', reverse(f'admin:{m.app_label}_{m.model_name}_changelist'), o.id, o.name)
-    get_model.short_description = _('Model')
-    get_model.admin_order_field = 'model'
+        return format_html('<a href="{}?id={}" target="_blank">{} {}</a>', reverse(f'admin:{m.app_label}_{m.model_name}_changelist'), o.id, o.manufacturer.name, o.name)
+    get_prod_model.short_description = _('Model')
+    get_prod_model.admin_order_field = 'model'
 
     def get_group(self, obj):
         o = obj.group
