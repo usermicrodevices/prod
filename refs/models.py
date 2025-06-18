@@ -211,7 +211,10 @@ class ProductModel(CustomAbstractModel):
     manufacturer = models.ForeignKey(Manufacturer, default=None, null=True, blank=True, on_delete=models.PROTECT, verbose_name=_('manufacturer'), help_text=_('manufacturer of model'))
 
     def __str__(self):
-        return self.name
+        try:
+            return f'{self.manufacturer.name} {self.name}'
+        except Exception as e:
+            return self.name
 
     class Meta:
         verbose_name = f'🖥{_("Product Model")}'
