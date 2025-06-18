@@ -724,3 +724,6 @@ msgstr "нельзя удалить документы"
 
 msgid "documents deleted"
 msgstr "документов удалено"
+
+msgid "copy name to extra label"
+msgstr "копировать название в этикетку"
