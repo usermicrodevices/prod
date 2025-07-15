@@ -4,7 +4,6 @@ from itertools import chain
 from datetime import datetime, timedelta, timezone
 from barcode import EAN13
 
-from django.conf import settings
 from django.db import models, transaction
 from django.db.models import F, Q, Max, Subquery, Value, IntegerField, JSONField
 from django.db.models.signals import pre_save, post_save, post_init, post_delete
