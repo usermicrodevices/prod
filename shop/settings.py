@@ -228,3 +228,5 @@ def NEW_ARTICLE_GENERATOR(obj_model, default=''):
     return default
 
 DEFAUL_IMAGE_THUMBNAIL = '''data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><text y="1em" font-size="26">📄</text></svg>'''
+
+ADMIN_CREATE_ORDER_USE_PRODUCT_BALANCE = True

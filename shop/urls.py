@@ -12,7 +12,9 @@ urlpatterns = [
     path('api/', include('api.urls')),
     path('admin/', admin.site.urls),
     path('favicon.ico', favicon)
-] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+]
+urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 
 def get_app_list(self, request, app_label=None):
@@ -20,5 +22,7 @@ def get_app_list(self, request, app_label=None):
     if not app_dict:
         return
     keys = list(app_dict.keys())
-    return [app_dict[k] for k in settings.ADMIN_MAIN_MENU_FIRST_ITEMS if k in keys] + [app_dict[k] for k in keys if k not in settings.ADMIN_MAIN_MENU_FIRST_ITEMS]
+    return [ app_dict[k] for k in settings.ADMIN_MAIN_MENU_FIRST_ITEMS if k in keys
+            ] + [ app_dict[k] for k in keys if k not in settings.ADMIN_MAIN_MENU_FIRST_ITEMS ]
+
 admin.AdminSite.get_app_list = get_app_list

@@ -1676,7 +1676,7 @@ class ProductAdmin(CustomModelAdmin):
 
     def order_from_selected_items(self, request, queryset):
         errs = ''
-        if queryset.count() > 1:
+        if queryset.count() > 0:
             get_model('core.Doc')()
             als = 'order'
             doc_type, created = DocType.objects.get_or_create(alias=als, defaults={'alias':als, 'name':als})
@@ -1688,7 +1688,16 @@ class ProductAdmin(CustomModelAdmin):
                 self.loge(e)
                 errs += f'{e}'
             else:
-                recs = [get_model('core.Record')(count=1, cost=p.cost, price=p.price, doc=doc, currency=p.currency, product=p) for p in queryset]
+                recs = [ get_model('core.Record')(
+                        count = self.get_count_from_reg(p) if getattr(settings, 'ADMIN_CREATE_ORDER_USE_PRODUCT_BALANCE', True) else 1,
+                        cost = p.cost,
+                        price = p.price,
+                        doc = doc,
+                        currency = p.currency,
+                        product = p
+                    )
+                    for p in queryset
+                ]
                 try:
                     obj_recs = get_model('core.Record').objects.bulk_create(recs)
                 except Exception as e:

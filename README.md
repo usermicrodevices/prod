@@ -4,6 +4,7 @@ django shop based on web-admin interface, also you can clone and
 build multiplatform frontend ["prod-flet"](https://github.com/usermicrodevices/prod-flet/)
 
 ![image](./screen.png "main screen")
+[![Watch the video](https://private-user-images.githubusercontent.com/29286243/405146926-3cfd55dd-da23-4c6a-b0f0-76157270812d.png)](https://youtu.be/f1Z-3CiYAfc)
 
 # installation
 ```
