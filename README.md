@@ -18,7 +18,7 @@ python -m venv venv
 . ./venv/bin/activate
 pip install -r requirements.txt
 ./manage.py collectstatic
-./manage.py makemigrations
+./manage.py makemigrations core refs users
 ./manage.py migrate
 ./manage.py createsuperuser --username superuser
 ./manage.py default_data
