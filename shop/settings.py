@@ -24,7 +24,8 @@ INSTALLED_APPS = [
     'users.apps.UsersConfig',
     'refs.apps.RefsConfig',
     'core.apps.CoreConfig',
-    'api.apps.ApiConfig'
+    'api.apps.ApiConfig',
+    'shop'
 ]
 
 MIDDLEWARE = [
