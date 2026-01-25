@@ -845,6 +845,9 @@ setTimeout(() => {
 class ProductAdmin(CustomModelAdmin):
     __objs__ = {}
     user = None
+    save_as = True
+    save_as_continue = True
+    save_on_top = True
     list_display = ['id', 'article', 'name', 'get_barcodes', 'get_qrcodes', 'get_price', 'get_count', 'get_sum', 'get_prod_model', 'get_group', 'get_thumbnail', 'extinfo', 'tax']
     list_display_links = ('id', 'article', 'name')
     search_fields = ('id', 'name', 'article', 'extinfo', 'barcodes__id', 'qrcodes__id', 'group__name', 'model__name', 'model__manufacturer__name')
